@@ -3,22 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
 import { bootstrapSupabaseAnon } from "@/lib/supabase/bootstrap";
+import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", icon: "⊞", label: "Dashboard" },
-  { href: "/create", icon: "✦", label: "Create Event" },
-  { href: "/timeline", icon: "◎", label: "My Timeline" },
-  { href: "/profile", icon: "◉", label: "Profile" },
-  { href: "/templates", icon: "⊟", label: "Templates" },
-  { href: "/pricing", icon: "◈", label: "Pricing" },
+  { href: "/dashboard", icon: "D", label: "Dashboard" },
+  { href: "/create", icon: "C", label: "Create" },
+  { href: "/timeline", icon: "S", label: "Saved Work" },
+  { href: "/profile", icon: "B", label: "Brand Profile" },
+  { href: "/templates", icon: "T", label: "Template Library" },
+  { href: "/pricing", icon: "$", label: "Pricing" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [profile, setProfile] = useState<UserProfile>(getEmptyProfile);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const handler = () => setProfile(loadProfile());
@@ -31,14 +32,44 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     void bootstrapSupabaseAnon();
   }, []);
 
+  useEffect(() => {
+    const syncViewport = () => setIsMobile(window.innerWidth < 960);
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
+
+  useEffect(() => {
+    setSidebarOpen(!isMobile);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [pathname, isMobile]);
+
   const steps = profileCompletionSteps(profile);
   const completedCount = steps.filter((step) => step.done).length;
   const completionPct = Math.round((completedCount / steps.length) * 100);
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#080808" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#080808", position: "relative" }}>
+      {isMobile && sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close navigation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            border: "none",
+            background: "rgba(0,0,0,0.55)",
+            zIndex: 9,
+            cursor: "pointer",
+          }}
+        />
+      )}
+
       <aside style={{
-        width: sidebarOpen ? "240px" : "0px",
+        width: sidebarOpen ? (isMobile ? "280px" : "240px") : "0px",
         flexShrink: 0,
         background: "#0e0e0e",
         borderRight: "1px solid #1a1a1a",
@@ -46,10 +77,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         flexDirection: "column",
         overflow: "hidden",
         transition: "width 0.25s ease",
-        position: "relative",
+        position: isMobile ? "fixed" : "relative",
+        left: 0,
+        top: 0,
+        bottom: 0,
         zIndex: 10,
+        boxShadow: isMobile && sidebarOpen ? "0 24px 64px rgba(0,0,0,0.45)" : "none",
       }}>
-        <div style={{ width: "240px", height: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ width: isMobile ? "280px" : "240px", height: "100%", display: "flex", flexDirection: "column" }}>
           <div style={{
             padding: "18px 20px 14px",
             borderBottom: "1px solid #1a1a1a",
@@ -80,10 +115,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "14px",
+                fontSize: "13px",
+                fontWeight: 700,
                 flexShrink: 0,
+                color: "#777",
               }}>
-                ◉
+                U
               </div>
             )}
             <div style={{ minWidth: 0 }}>
@@ -106,10 +143,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <nav style={{ flex: 1, padding: "12px 10px", display: "flex", flexDirection: "column", gap: "2px" }}>
             {NAV_ITEMS.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => {
+                    if (isMobile) setSidebarOpen(false);
+                  }}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -125,7 +166,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     borderLeft: active ? "2px solid #a3e635" : "2px solid transparent",
                   }}
                 >
-                  <span style={{ fontSize: "14px", opacity: active ? 1 : 0.6 }}>{item.icon}</span>
+                  <span style={{
+                    width: "18px",
+                    textAlign: "center",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    opacity: active ? 1 : 0.6,
+                  }}>
+                    {item.icon}
+                  </span>
                   {item.label}
                 </Link>
               );
@@ -170,7 +219,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   textDecoration: "none",
                 }}
               >
-                Complete Profile
+                Complete Brand Profile
               </Link>
             </div>
           )}
@@ -178,6 +227,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div style={{ padding: "12px 10px", borderTop: "1px solid #1a1a1a" }}>
             <Link
               href="/sign-in"
+              onClick={() => {
+                if (isMobile) setSidebarOpen(false);
+              }}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -187,16 +239,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 textDecoration: "none",
                 padding: "8px 12px",
                 borderRadius: "6px",
-                transition: "color 0.15s",
               }}
             >
-              ↪ Sign Out
+              {"<-"} Sign Out
             </Link>
           </div>
         </div>
       </aside>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <header style={{
           height: "52px",
           flexShrink: 0,
@@ -204,7 +255,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           borderBottom: "1px solid #1a1a1a",
           display: "flex",
           alignItems: "center",
-          padding: "0 20px",
+          padding: isMobile ? "0 14px" : "0 20px",
           gap: "12px",
         }}>
           <button
@@ -212,14 +263,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             style={{
               background: "transparent",
               color: "#555",
-              fontSize: "16px",
+              fontSize: "14px",
               padding: "4px 8px",
               borderRadius: "6px",
               border: "none",
               cursor: "pointer",
             }}
           >
-            ☰
+            Menu
           </button>
 
           <div style={{ flex: 1 }} />
@@ -234,12 +285,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               fontWeight: 700,
               borderRadius: "7px",
               textDecoration: "none",
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
             }}
           >
-            ✦ New Event
+            {isMobile ? "New" : "New Post"}
           </Link>
 
           <Link
@@ -253,6 +301,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               borderRadius: "7px",
               textDecoration: "none",
               border: "1px solid #2a2a2a",
+              display: isMobile ? "none" : "inline-flex",
             }}
           >
             Upgrade

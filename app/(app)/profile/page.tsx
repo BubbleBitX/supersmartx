@@ -162,10 +162,10 @@ export default function ProfilePage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", flexWrap: "wrap", marginBottom: "28px" }}>
         <div>
           <h1 style={{ fontSize: "22px", fontWeight: 800, color: "#f0f0f0", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
-            Your Profile
+            Brand Profile
           </h1>
           <p style={{ fontSize: "13px", color: "#555", margin: 0 }}>
-            Set up once and auto-fill every future event you create
+            Set this up once to improve autofill, previews, and final output quality everywhere in Create.
           </p>
         </div>
         <button onClick={handleSave} style={{
@@ -176,7 +176,7 @@ export default function ProfilePage() {
           borderRadius: "8px", border: saved ? "1px solid #a3e635" : "none",
           cursor: "pointer", transition: "all 0.2s",
         }}>
-          {saved ? "✓ Saved!" : "Save Profile"}
+          {saved ? "Saved!" : "Save Brand Profile"}
         </button>
       </div>
 
@@ -207,7 +207,7 @@ export default function ProfilePage() {
               {steps.map((s, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <span style={{ fontSize: "11px", color: s.done ? "#a3e635" : "#333" }}>
-                    {s.done ? "✓" : "○"}
+                    {s.done ? "OK" : "o"}
                   </span>
                   <span style={{ fontSize: "11px", color: s.done ? "#888" : "#444" }}>{s.label}</span>
                 </div>
@@ -237,7 +237,7 @@ export default function ProfilePage() {
                 {profile.photoUrl
                   ? <img src={profile.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : <div style={{ textAlign: "center", pointerEvents: "none" }}>
-                      <div style={{ fontSize: "20px" }}>📷</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700 }}>IMG</div>
                       <div style={{ fontSize: "8px", color: "#555", marginTop: "2px" }}>Photo</div>
                     </div>
                 }
@@ -246,7 +246,7 @@ export default function ProfilePage() {
                   width: "18px", height: "18px", borderRadius: "50%",
                   background: "#a3e635", display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: "10px",
-                }}>↑</div>
+                }}>+</div>
               </div>
               <input ref={photoRef} type="file" accept="image/*"
                 onChange={e => e.target.files?.[0] && handleImageUpload(e.target.files[0], "photoUrl")}
@@ -266,7 +266,7 @@ export default function ProfilePage() {
                 {profile.logoUrl
                   ? <img src={profile.logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", padding: "4px" }} />
                   : <div style={{ textAlign: "center", pointerEvents: "none" }}>
-                      <div style={{ fontSize: "20px" }}>🏷️</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700 }}>LOGO</div>
                       <div style={{ fontSize: "8px", color: "#555", marginTop: "2px" }}>Logo</div>
                     </div>
                 }
@@ -275,7 +275,7 @@ export default function ProfilePage() {
                   width: "18px", height: "18px", borderRadius: "50%",
                   background: "#a3e635", display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: "10px",
-                }}>↑</div>
+                }}>+</div>
               </div>
               <input ref={logoRef} type="file" accept="image/*"
                 onChange={e => e.target.files?.[0] && handleImageUpload(e.target.files[0], "logoUrl")}

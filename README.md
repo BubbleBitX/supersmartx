@@ -6,11 +6,13 @@ Personal branding announcement platform for turning milestones into polished, pl
 
 SuperSmartX helps a user:
 
+- start from one create hub
 - choose a category or template
 - fill structured event details
 - select one or more publishing platforms
 - customize the visual card style
 - generate platform-specific copy plus downloadable image assets where a graphic makes sense
+- save outputs for reuse later
 
 The current create flow supports:
 
@@ -19,21 +21,37 @@ The current create flow supports:
 
 ## Current product flow
 
+Primary IA:
+
+- `Dashboard` for overview and recent saved work
+- `Create` as the single creation hub
+- `Saved Work` for reuse and cleanup
+- `Brand Profile` for autofill and preview quality
+- `Template Library` as a fast-start mode inside the create system
+
 Manual flow:
 
-1. Category
-2. Event
-3. Platforms
-4. Details
-5. Style
-6. Generate
+1. Entry
+2. Category
+3. Event
+4. Platforms
+5. Details
+6. Style
+7. Generate
 
 Template flow:
 
-1. Template
-2. Details
-3. Style
-4. Generate
+1. Entry or Template Library
+2. Template
+3. Details
+4. Style
+5. Generate
+
+Saved work flow:
+
+1. Generate content
+2. Review in `Saved Work`
+3. Reuse an item through `/create?reuse=...`
 
 ## Platform-aware output behavior
 
@@ -108,6 +126,7 @@ npx tsc --noEmit
 - [lib/platforms/caption-engine.ts](/C:/Users/heman_naocpgi/Downloads/supersmartx/lib/platforms/caption-engine.ts)
 - [lib/events/categories.ts](/C:/Users/heman_naocpgi/Downloads/supersmartx/lib/events/categories.ts)
 - [lib/templates.ts](/C:/Users/heman_naocpgi/Downloads/supersmartx/lib/templates.ts)
+- [docs/user-flows.md](/C:/Users/heman_naocpgi/Downloads/supersmartx/docs/user-flows.md)
 
 ## Notes
 

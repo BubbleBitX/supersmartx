@@ -26,6 +26,7 @@ import { generatePlatformCaption, PlatformContent } from "@/lib/platforms/captio
 import {
   ACCENT_COLORS,
   THEMES,
+  TEMPLATES,
   LAYOUTS,
   PROFILE_SHAPES,
   BADGE_STYLES,
@@ -43,14 +44,21 @@ import {
   CtaStyle,
   DownloadFormat,
 } from "@/lib/templates";
-import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, UserProfile } from "@/lib/profile";
-import { getEventTypeIdForTemplateId } from "@/lib/routing";
-import { saveToTimeline } from "@/lib/timeline";
+import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
+import { getCreateHrefForTemplateId, getEventTypeIdForTemplateId } from "@/lib/routing";
+import { loadTimeline, saveToTimeline } from "@/lib/timeline";
 import AchievementCard from "@/components/AchievementCard";
 
-type Step = "category" | "event" | "platforms" | "form" | "style" | "output";
+type Step = "entry" | "category" | "event" | "platforms" | "form" | "style" | "output";
 type ProgressStepKey = Step | "template";
 type ProgressStep = { key: ProgressStepKey; label: string; num: number };
+
+const PLATFORM_PRESETS: Array<{ key: string; label: string; hint: string; platforms: PlatformSlug[] }> = [
+  { key: "starter", label: "Starter", hint: "LinkedIn + X for fast personal posts", platforms: ["linkedin", "twitter"] },
+  { key: "visual", label: "Visual", hint: "LinkedIn + Instagram for graphic-first sharing", platforms: ["linkedin", "instagram"] },
+  { key: "community", label: "Community", hint: "Threads + Reddit + Discord for discussion", platforms: ["threads", "reddit", "discord"] },
+  { key: "launch", label: "Launch", hint: "Product Hunt + LinkedIn + X for launches", platforms: ["producthunt", "linkedin", "twitter"] },
+];
 
 const DEFAULT_PROGRESS_STEPS: ProgressStep[] = [
   { key: "category", label: "Category", num: 1 },
@@ -97,6 +105,7 @@ export default function CreateFlow() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedTemplateId = searchParams.get("template");
+  const reuseEventId = searchParams.get("reuse");
   const requestedEventTypeId = searchParams.get("eventType")
     || (selectedTemplateId ? getEventTypeIdForTemplateId(selectedTemplateId) : null);
   const initialEvent = requestedEventTypeId
@@ -104,8 +113,10 @@ export default function CreateFlow() {
     : null;
   const initialCategory = initialEvent?.category || (searchParams.get("category") as EventCategorySlug) || null;
   const cameFromTemplate = !!selectedTemplateId;
+  const hasDirectCreateIntent = !!selectedTemplateId || !!requestedEventTypeId || !!initialCategory;
 
   const [step, setStep] = useState<Step>(() => {
+    if (!hasDirectCreateIntent) return "entry";
     if (initialEvent) return "form";
     if (initialCategory) return "event";
     return "category";
@@ -160,6 +171,27 @@ export default function CreateFlow() {
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, syncProfile);
   }, []);
 
+  useEffect(() => {
+    if (!reuseEventId) return;
+
+    const timelineEvent = loadTimeline().find((event) => event.id === reuseEventId);
+    if (!timelineEvent) return;
+
+    const reusedEvent = EVENT_TYPES.find((eventType) => eventType.id === timelineEvent.eventTypeId);
+    if (!reusedEvent) return;
+
+    const validPlatforms = timelineEvent.platforms.filter((platform): platform is PlatformSlug =>
+      PLATFORMS.some((candidate) => candidate.slug === platform)
+    );
+
+    setCategory(reusedEvent.category);
+    setEvent(reusedEvent);
+    setPlatforms(validPlatforms.length > 0 ? validPlatforms : DEFAULT_PLATFORMS);
+    setFormValues((current) => ({ ...current, ...timelineEvent.values }));
+    setActivePlatformTab(validPlatforms[0] || "linkedin");
+    setStep("form");
+  }, [reuseEventId]);
+
   const handleFormBack = () => {
     if (cameFromTemplate) {
       router.push("/templates");
@@ -173,15 +205,16 @@ export default function CreateFlow() {
       router.push("/create");
       return;
     }
-    setStep("category");
+    setStep("entry");
     setEvent(null);
     setCategory(null);
+    setPlatforms(DEFAULT_PLATFORMS);
   };
 
   const progressSteps = cameFromTemplate ? TEMPLATE_PROGRESS_STEPS : DEFAULT_PROGRESS_STEPS;
   const currentProgressKey: ProgressStepKey = cameFromTemplate
     ? (step === "style" || step === "output" ? step : "form")
-    : step;
+    : (step === "entry" ? "category" : step);
 
   const handleProgressStepClick = (key: ProgressStepKey) => {
     if (key === "template") {
@@ -258,6 +291,16 @@ export default function CreateFlow() {
   };
 
   const fmt = DOWNLOAD_FORMATS.find((format) => format.key === downloadFormat)!;
+  const selectedPlatformSet = new Set(selectedPlatforms);
+  const requiredFields = selectedEvent?.fields.filter((field) => field.required) || [];
+  const missingRequiredFields = requiredFields.filter((field) => !(formValues[field.key] || "").trim());
+  const hasMissingRequiredFields = missingRequiredFields.length > 0;
+  const profileSeededCount = selectedEvent
+    ? ["name", "role", "company"].filter((key) => selectedEvent.fields.some((field) => field.key === key) && (formValues[key] || "").trim()).length
+    : 0;
+  const profileSteps = profileCompletionSteps(profile);
+  const profileCompletionPct = Math.round((profileSteps.filter((stepItem) => stepItem.done).length / profileSteps.length) * 100);
+  const featuredTemplates = TEMPLATES.slice(0, 4);
 
   const handleDownload = useCallback(async () => {
     if (!cardRef.current) return;
@@ -318,6 +361,7 @@ export default function CreateFlow() {
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      {step !== "entry" && (
       <div style={{
         padding: "14px clamp(16px, 3vw, 32px)",
         borderBottom: "1px solid #1a1a1a",
@@ -357,7 +401,7 @@ export default function CreateFlow() {
                   fontWeight: 700,
                   color: done ? "#000" : active ? "#a3e635" : "#555",
                 }}>
-                  {done ? "✓" : item.num}
+                  {done ? "OK" : item.num}
                 </div>
                 <span style={{ fontSize: "11px", fontWeight: active ? 700 : 500, color: active ? "#f0f0f0" : "#555" }}>
                   {item.label}
@@ -370,8 +414,222 @@ export default function CreateFlow() {
           );
         })}
       </div>
+      )}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "28px clamp(16px, 3vw, 32px) 36px" }}>
+        {step === "entry" && (
+          <div style={{ maxWidth: "1080px", margin: "0 auto" }}>
+            {profileCompletionPct < 100 && (
+              <div style={{
+                background: "#111",
+                border: "1px solid #1e2a12",
+                borderLeft: "3px solid #a3e635",
+                borderRadius: "14px",
+                padding: "16px 18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "14px",
+                flexWrap: "wrap",
+                marginBottom: "20px",
+              }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#f0f0f0", marginBottom: "4px" }}>
+                    Complete your brand profile for stronger previews
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#666", lineHeight: 1.55 }}>
+                    {profileCompletionPct}% complete. Photo, role, company, and brand details improve autofill and final output quality.
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push("/profile")}
+                  style={{
+                    padding: "8px 14px",
+                    background: "#a3e635",
+                    color: "#000",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    borderRadius: "8px",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  Complete Brand Profile
+                </button>
+              </div>
+            )}
+            <div style={{ marginBottom: "28px" }}>
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "7px 12px",
+                borderRadius: "999px",
+                background: "#111",
+                border: "1px solid #1e1e1e",
+                color: "#a3e635",
+                fontSize: "11px",
+                fontWeight: 700,
+                marginBottom: "14px",
+              }}>
+                Quick Start
+              </div>
+              <h2 style={{ fontSize: "28px", fontWeight: 800, color: "#f0f0f0", margin: "0 0 8px", letterSpacing: "-0.04em" }}>
+                Choose how you want to create
+              </h2>
+              <p style={{ fontSize: "14px", color: "#666", margin: 0, lineHeight: 1.65, maxWidth: "720px" }}>
+                Start from a proven template for speed, or build from category if you want more control over the event structure.
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "24px" }}>
+              <button
+                onClick={() => setStep("category")}
+                style={{
+                  textAlign: "left",
+                  padding: "22px",
+                  borderRadius: "18px",
+                  background: "linear-gradient(180deg, rgba(163,230,53,0.08) 0%, #111 100%)",
+                  border: "1px solid #314415",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontSize: "28px", marginBottom: "12px" }}>M</div>
+                <div style={{ fontSize: "16px", fontWeight: 800, color: "#f0f0f0", marginBottom: "6px" }}>
+                  Start manually
+                </div>
+                <div style={{ fontSize: "12px", color: "#666", lineHeight: 1.6, marginBottom: "12px" }}>
+                  Pick a category, choose the exact event type, then generate platform-aware content.
+                </div>
+                <div style={{ fontSize: "11px", color: "#a3e635", fontWeight: 700 }}>
+                  Best for custom announcements and flexible workflows {"->"}
+                </div>
+              </button>
+
+              <button
+                onClick={() => router.push("/templates")}
+                style={{
+                  textAlign: "left",
+                  padding: "22px",
+                  borderRadius: "18px",
+                  background: "#111",
+                  border: "1px solid #1e1e1e",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontSize: "28px", marginBottom: "12px" }}>T</div>
+                <div style={{ fontSize: "16px", fontWeight: 800, color: "#f0f0f0", marginBottom: "6px" }}>
+                  Start from a template
+                </div>
+                <div style={{ fontSize: "12px", color: "#666", lineHeight: 1.6, marginBottom: "12px" }}>
+                  Use a ready-made structure like hackathon selection, product launch, certification, or newsletter.
+                </div>
+                <div style={{ fontSize: "11px", color: "#60a5fa", fontWeight: 700 }}>
+                  Best for faster creation with less setup {"->"}
+                </div>
+              </button>
+            </div>
+
+            <div style={{
+              background: "#111",
+              border: "1px solid #1a1a1a",
+              borderRadius: "16px",
+              padding: "18px",
+            }}>
+              <div style={{ fontSize: "11px", color: "#777", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "10px" }}>
+                Popular shortcuts
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px" }}>
+                {EVENT_CATEGORIES.slice(0, 4).map((category) => (
+                  <button
+                    key={category.slug}
+                    onClick={() => {
+                      setCategory(category.slug);
+                      setStep("event");
+                    }}
+                    style={{
+                      textAlign: "left",
+                      padding: "14px",
+                      borderRadius: "12px",
+                      background: "#151515",
+                      border: "1px solid #202020",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ fontSize: "18px", marginBottom: "8px" }}>{category.icon}</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#f0f0f0", marginBottom: "4px" }}>
+                      {category.label}
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#666", lineHeight: 1.55 }}>
+                      {category.description}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{
+              background: "#111",
+              border: "1px solid #1a1a1a",
+              borderRadius: "16px",
+              padding: "18px",
+              marginTop: "16px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "10px" }}>
+                <div>
+                  <div style={{ fontSize: "11px", color: "#777", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "4px" }}>
+                    Featured Templates
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#666" }}>
+                    Templates are the fastest path inside Create when you already know the post format.
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push("/templates")}
+                  style={{
+                    padding: "8px 14px",
+                    background: "#161616",
+                    color: "#f0f0f0",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    borderRadius: "8px",
+                    border: "1px solid #2a2a2a",
+                    cursor: "pointer",
+                  }}
+                >
+                  Open Template Library
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px" }}>
+                {featuredTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => router.push(getCreateHrefForTemplateId(template.id))}
+                    style={{
+                      textAlign: "left",
+                      padding: "14px",
+                      borderRadius: "12px",
+                      background: "#151515",
+                      border: "1px solid #202020",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#f0f0f0", marginBottom: "5px" }}>
+                      {template.name}
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#666", lineHeight: 1.55, marginBottom: "8px" }}>
+                      {template.fields.filter((field) => field.required).length} required fields
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#60a5fa", fontWeight: 700 }}>
+                      Use this template
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {step === "category" && (
           <div style={{ maxWidth: "1120px" }}>
             <h2 style={{ fontSize: "20px", fontWeight: 800, color: "#f0f0f0", margin: "0 0 4px" }}>
@@ -507,6 +765,41 @@ export default function CreateFlow() {
                 <p style={{ fontSize: "12px", color: "#555", margin: "2px 0 0" }}>Select all platforms and we will generate native output for each</p>
               </div>
             </div>
+            <div style={{ marginBottom: "18px" }}>
+              <div style={{ fontSize: "11px", color: "#777", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "8px" }}>
+                Recommended presets
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px" }}>
+                {PLATFORM_PRESETS.map((preset) => {
+                  const isActive = preset.platforms.length === selectedPlatforms.length
+                    && preset.platforms.every((platform) => selectedPlatformSet.has(platform));
+                  return (
+                    <button
+                      key={preset.key}
+                      onClick={() => setPlatforms(preset.platforms)}
+                      style={{
+                        textAlign: "left",
+                        padding: "12px 14px",
+                        borderRadius: "12px",
+                        background: isActive ? "#141e08" : "#111",
+                        border: `1px solid ${isActive ? "#a3e635" : "#1a1a1a"}`,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: isActive ? "#f0f0f0" : "#d0d0d0", marginBottom: "4px" }}>
+                        {preset.label}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#666", lineHeight: 1.5, marginBottom: "7px" }}>
+                        {preset.hint}
+                      </div>
+                      <div style={{ fontSize: "10px", color: isActive ? "#a3e635" : "#555" }}>
+                        {preset.platforms.map((slug) => PLATFORMS.find((platform) => platform.slug === slug)?.label).join(" / ")}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "24px" }}>
               {PLATFORMS.map((platform) => {
                 const selected = selectedPlatforms.includes(platform.slug);
@@ -573,6 +866,29 @@ export default function CreateFlow() {
                 <p style={{ fontSize: "12px", color: "#555", margin: "2px 0 0" }}>Fill in the details</p>
               </div>
             </div>
+            <div style={{
+              background: "#111",
+              border: `1px solid ${hasMissingRequiredFields ? "#3a2222" : "#1e2a12"}`,
+              borderRadius: "12px",
+              padding: "14px 16px",
+              marginBottom: "16px",
+            }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: hasMissingRequiredFields ? "#fca5a5" : "#a3e635", marginBottom: "4px" }}>
+                {hasMissingRequiredFields
+                  ? `Complete ${missingRequiredFields.length} more required field${missingRequiredFields.length > 1 ? "s" : ""} to continue`
+                  : "Required fields complete"}
+              </div>
+              <div style={{ fontSize: "11px", color: "#666", lineHeight: 1.55 }}>
+                {hasMissingRequiredFields
+                  ? missingRequiredFields.map((field) => field.label).join(" / ")
+                  : "You can move to style now. Name, role, and company are auto-filled from your profile when available."}
+              </div>
+              {profileSeededCount > 0 && (
+                <div style={{ fontSize: "10px", color: "#555", marginTop: "8px" }}>
+                  {profileSeededCount} field{profileSeededCount > 1 ? "s were" : " was"} auto-filled from your profile.
+                </div>
+              )}
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {selectedEvent.fields.map((field) => (
                 <div key={field.key}>
@@ -612,8 +928,20 @@ export default function CreateFlow() {
                   )}
                 </div>
               ))}
-              <button onClick={() => setStep("style")} style={{ ...primaryButtonStyle, width: "100%" }}>
-                Continue to Style →
+              <button
+                onClick={() => {
+                  if (hasMissingRequiredFields) return;
+                  setStep("style");
+                }}
+                disabled={hasMissingRequiredFields}
+                style={{
+                  ...primaryButtonStyle,
+                  width: "100%",
+                  opacity: hasMissingRequiredFields ? 0.45 : 1,
+                  cursor: hasMissingRequiredFields ? "not-allowed" : "pointer",
+                }}
+              >
+                {hasMissingRequiredFields ? "Complete required fields to continue" : "Continue to Style →"}
               </button>
             </div>
           </div>
@@ -783,18 +1111,35 @@ export default function CreateFlow() {
                   Generated for {selectedPlatforms.length} platform{selectedPlatforms.length > 1 ? "s" : ""}
                 </p>
               </div>
-              <button onClick={handleCreateNewEvent} style={{
-                padding: "8px 16px",
-                background: "#1a1a1a",
-                color: "#ccc",
-                fontSize: "12px",
-                fontWeight: 600,
-                borderRadius: "8px",
-                border: "1px solid #2a2a2a",
-                cursor: "pointer",
-              }}>
-                Create New Event
-              </button>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  onClick={() => router.push("/timeline")}
+                  style={{
+                    padding: "8px 16px",
+                    background: "#111",
+                    color: "#a3e635",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    borderRadius: "8px",
+                    border: "1px solid #304217",
+                    cursor: "pointer",
+                  }}
+                >
+                  Open Saved Work
+                </button>
+                <button onClick={handleCreateNewEvent} style={{
+                  padding: "8px 16px",
+                  background: "#1a1a1a",
+                  color: "#ccc",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  borderRadius: "8px",
+                  border: "1px solid #2a2a2a",
+                  cursor: "pointer",
+                }}>
+                  Create Another Post
+                </button>
+              </div>
             </div>
 
             <div style={{ display: "flex", gap: "4px", background: "#141414", borderRadius: "8px", padding: "4px", width: "fit-content", marginBottom: "20px" }}>
@@ -901,7 +1246,7 @@ export default function CreateFlow() {
                             cursor: "pointer",
                             whiteSpace: "nowrap",
                           }}>
-                            {copied === slug ? "✓ Copied" : "Copy"}
+                            {copied === slug ? "Copied" : "Copy"}
                           </button>
                         </div>
                       );
@@ -987,7 +1332,7 @@ export default function CreateFlow() {
                               borderRadius: "6px",
                               cursor: "pointer",
                             }}>
-                              {copied === fieldCopyKey ? "✓ Copied" : `Copy ${OUTPUT_TYPE_LABELS[field]}`}
+                              {copied === fieldCopyKey ? "Copied" : `Copy ${OUTPUT_TYPE_LABELS[field]}`}
                             </button>
                           </div>
                         </div>
@@ -1006,7 +1351,7 @@ export default function CreateFlow() {
                         border: `1px solid ${copied === activePlatformMeta.slug ? "#a3e635" : "#2a2a2a"}`,
                         cursor: "pointer",
                       }}>
-                        {copied === activePlatformMeta.slug ? "✓ Copied!" : activeTextOutputs.length > 1 ? "Copy All Fields" : `Copy ${OUTPUT_TYPE_LABELS[activePrimaryOutput]}`}
+                        {copied === activePlatformMeta.slug ? "Copied!" : activeTextOutputs.length > 1 ? "Copy All Fields" : `Copy ${OUTPUT_TYPE_LABELS[activePrimaryOutput]}`}
                       </button>
                       {activePlatformMeta.slug === "linkedin" && (
                         <button
@@ -1086,7 +1431,7 @@ export default function CreateFlow() {
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "8px" }}>
                       {activePlatformMeta.rules.style.map((rule, index) => (
                         <div key={index} style={{ fontSize: "10px", color: "#888", display: "flex", gap: "5px" }}>
-                          <span style={{ color: "#a3e635" }}>✓</span> {rule}
+                          <span style={{ color: "#a3e635" }}>+</span> {rule}
                         </div>
                       ))}
                     </div>
@@ -1095,7 +1440,7 @@ export default function CreateFlow() {
                         <div style={{ fontSize: "10px", color: "#555", marginBottom: "4px" }}>Avoid:</div>
                         {activePlatformMeta.rules.avoid.map((rule, index) => (
                           <div key={index} style={{ fontSize: "10px", color: "#555", display: "flex", gap: "5px" }}>
-                            <span style={{ color: "#f87171" }}>✕</span> {rule}
+                            <span style={{ color: "#f87171" }}>x</span> {rule}
                           </div>
                         ))}
                       </div>
@@ -1210,7 +1555,7 @@ function buildCustomEventType(category: EventCategorySlug): EventType {
   return {
     id: `custom-${category}`,
     label: `Custom ${categoryMeta.label}`,
-    icon: "✨",
+    icon: "Custom",
     category,
     cardHeadline: "{{achievement}}",
     baseSummary: "{{name}} is sharing a custom update",
@@ -1260,3 +1605,4 @@ const inputStyle: React.CSSProperties = {
   transition: "border-color 0.2s",
   boxSizing: "border-box",
 };
+
