@@ -206,9 +206,15 @@ export default function ProfilePage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "6px" }}>
               {steps.map((s, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontSize: "11px", color: s.done ? "#a3e635" : "#333" }}>
-                    {s.done ? "OK" : "o"}
-                  </span>
+                  <span style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: s.done ? "#a3e635" : "transparent",
+                    border: `1px solid ${s.done ? "#a3e635" : "#333"}`,
+                    display: "inline-block",
+                    flexShrink: 0,
+                  }} />
                   <span style={{ fontSize: "11px", color: s.done ? "#888" : "#444" }}>{s.label}</span>
                 </div>
               ))}
@@ -236,10 +242,7 @@ export default function ProfilePage() {
               >
                 {profile.photoUrl
                   ? <img src={profile.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  : <div style={{ textAlign: "center", pointerEvents: "none" }}>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>IMG</div>
-                      <div style={{ fontSize: "8px", color: "#555", marginTop: "2px" }}>Photo</div>
-                    </div>
+                  : <UploadPlaceholder variant="photo" />
                 }
                 <div style={{
                   position: "absolute", bottom: "2px", right: "2px",
@@ -265,10 +268,7 @@ export default function ProfilePage() {
               >
                 {profile.logoUrl
                   ? <img src={profile.logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", padding: "4px" }} />
-                  : <div style={{ textAlign: "center", pointerEvents: "none" }}>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>LOGO</div>
-                      <div style={{ fontSize: "8px", color: "#555", marginTop: "2px" }}>Logo</div>
-                    </div>
+                  : <UploadPlaceholder variant="logo" />
                 }
                 <div style={{
                   position: "absolute", bottom: "2px", right: "2px",
@@ -594,6 +594,33 @@ export default function ProfilePage() {
         </div>
 
       </div>
+    </div>
+  );
+}
+
+function UploadPlaceholder({ variant }: { variant: "photo" | "logo" }) {
+  return (
+    <div style={{ textAlign: "center", pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "5px" }}>
+      <div style={{
+        width: variant === "photo" ? "22px" : "24px",
+        height: variant === "photo" ? "16px" : "20px",
+        borderRadius: variant === "photo" ? "6px" : "5px",
+        border: "1.5px solid #6a6a6a",
+        position: "relative",
+      }}>
+        {variant === "photo" ? (
+          <>
+            <span style={{ position: "absolute", width: "4px", height: "4px", borderRadius: "50%", background: "#6a6a6a", top: "3px", right: "4px" }} />
+            <span style={{ position: "absolute", left: "3px", right: "3px", bottom: "3px", height: "6px", background: "linear-gradient(135deg, transparent 0 30%, #6a6a6a 30% 62%, transparent 62%)" }} />
+          </>
+        ) : (
+          <>
+            <span style={{ position: "absolute", inset: "4px", borderRadius: "3px", background: "#6a6a6a" }} />
+            <span style={{ position: "absolute", left: "5px", right: "5px", top: "8px", height: "1px", background: "#161616" }} />
+          </>
+        )}
+      </div>
+      <div style={{ fontSize: "8px", color: "#555" }}>{variant === "photo" ? "Photo" : "Logo"}</div>
     </div>
   );
 }

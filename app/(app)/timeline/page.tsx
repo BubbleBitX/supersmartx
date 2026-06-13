@@ -88,7 +88,9 @@ export default function TimelinePage() {
           border: "1px dashed #1e1e1e",
           borderRadius: "16px",
         }}>
-          <div style={{ fontSize: "40px", marginBottom: "12px", opacity: 0.2 }}>SW</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px", opacity: 0.6 }}>
+            <EmptyStateGlyph />
+          </div>
           <div style={{ fontSize: "15px", fontWeight: 600, color: "#555" }}>No saved work yet</div>
           <div style={{ fontSize: "13px", color: "#333", marginTop: "6px", marginBottom: "20px" }}>
             Every generated post will land here so you can reuse the setup later.
@@ -189,5 +191,24 @@ export default function TimelinePage() {
         ))
       )}
     </div>
+  );
+}
+
+function EmptyStateGlyph() {
+  return (
+    <span style={{
+      width: "40px",
+      height: "40px",
+      borderRadius: "14px",
+      border: "1px dashed #2b2b2b",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+    }}>
+      <span style={{ width: "18px", height: "2px", borderRadius: "999px", background: "#353535", position: "absolute", top: "12px" }} />
+      <span style={{ width: "22px", height: "2px", borderRadius: "999px", background: "#353535" }} />
+      <span style={{ width: "14px", height: "2px", borderRadius: "999px", background: "#353535", position: "absolute", bottom: "12px" }} />
+    </span>
   );
 }

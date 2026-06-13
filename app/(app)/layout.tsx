@@ -7,12 +7,12 @@ import { bootstrapSupabaseAnon } from "@/lib/supabase/bootstrap";
 import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", icon: "D", label: "Dashboard" },
-  { href: "/create", icon: "C", label: "Create" },
-  { href: "/timeline", icon: "S", label: "Saved Work" },
-  { href: "/profile", icon: "B", label: "Brand Profile" },
-  { href: "/templates", icon: "T", label: "Template Library" },
-  { href: "/pricing", icon: "$", label: "Pricing" },
+  { href: "/dashboard", icon: "grid", label: "Dashboard" },
+  { href: "/create", icon: "spark", label: "Create" },
+  { href: "/timeline", icon: "stack", label: "Saved Work" },
+  { href: "/profile", icon: "user", label: "Brand Profile" },
+  { href: "/templates", icon: "tiles", label: "Template Library" },
+  { href: "/pricing", icon: "tag", label: "Pricing" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -106,22 +106,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 }}
               />
             ) : (
-              <div style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                background: "#1a1a1a",
-                border: "1px solid #2a2a2a",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "13px",
-                fontWeight: 700,
-                flexShrink: 0,
-                color: "#777",
-              }}>
-                U
-              </div>
+              <AvatarPlaceholder />
             )}
             <div style={{ minWidth: 0 }}>
               <div style={{
@@ -166,14 +151,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     borderLeft: active ? "2px solid #a3e635" : "2px solid transparent",
                   }}
                 >
-                  <span style={{
-                    width: "18px",
-                    textAlign: "center",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    opacity: active ? 1 : 0.6,
-                  }}>
-                    {item.icon}
+                  <span style={{ width: "18px", display: "inline-flex", justifyContent: "center", opacity: active ? 1 : 0.6 }}>
+                    <NavIcon kind={item.icon} active={active} />
                   </span>
                   {item.label}
                 </Link>
@@ -313,5 +292,99 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+  );
+}
+
+function AvatarPlaceholder() {
+  return (
+    <div style={{
+      width: "36px",
+      height: "36px",
+      borderRadius: "50%",
+      background: "#1a1a1a",
+      border: "1px solid #2a2a2a",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      position: "relative",
+    }}>
+      <span style={{
+        width: "10px",
+        height: "10px",
+        borderRadius: "50%",
+        background: "#7a7a7a",
+        position: "absolute",
+        top: "8px",
+      }} />
+      <span style={{
+        width: "18px",
+        height: "9px",
+        borderRadius: "999px 999px 6px 6px",
+        background: "#5c5c5c",
+        position: "absolute",
+        bottom: "7px",
+      }} />
+    </div>
+  );
+}
+
+function NavIcon({ kind, active }: { kind: string; active: boolean }) {
+  const tone = active ? "#a3e635" : "#666";
+
+  if (kind === "grid") {
+    return (
+      <span style={{ display: "grid", gridTemplateColumns: "repeat(2, 4px)", gap: "2px" }}>
+        {[0, 1, 2, 3].map((item) => (
+          <span key={item} style={{ width: "4px", height: "4px", borderRadius: "1px", background: tone }} />
+        ))}
+      </span>
+    );
+  }
+
+  if (kind === "spark") {
+    return (
+      <span style={{ position: "relative", width: "12px", height: "12px", display: "inline-block" }}>
+        <span style={{ position: "absolute", left: "5px", top: "0", width: "2px", height: "12px", borderRadius: "999px", background: tone }} />
+        <span style={{ position: "absolute", left: "0", top: "5px", width: "12px", height: "2px", borderRadius: "999px", background: tone }} />
+      </span>
+    );
+  }
+
+  if (kind === "stack") {
+    return (
+      <span style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+        {[0, 1, 2].map((item) => (
+          <span key={item} style={{ width: "12px", height: "2px", borderRadius: "999px", background: tone }} />
+        ))}
+      </span>
+    );
+  }
+
+  if (kind === "user") {
+    return (
+      <span style={{ position: "relative", width: "12px", height: "12px", display: "inline-block" }}>
+        <span style={{ position: "absolute", left: "3px", top: "0", width: "6px", height: "6px", borderRadius: "50%", border: `1.5px solid ${tone}` }} />
+        <span style={{ position: "absolute", left: "1px", bottom: "0", width: "10px", height: "5px", borderRadius: "999px 999px 3px 3px", border: `1.5px solid ${tone}` }} />
+      </span>
+    );
+  }
+
+  if (kind === "tiles") {
+    return (
+      <span style={{ display: "grid", gridTemplateColumns: "repeat(2, 5px)", gridTemplateRows: "repeat(2, 5px)", gap: "2px" }}>
+        <span style={{ borderRadius: "2px", background: tone }} />
+        <span style={{ borderRadius: "2px", background: tone, opacity: 0.8 }} />
+        <span style={{ borderRadius: "2px", background: tone, opacity: 0.8 }} />
+        <span style={{ borderRadius: "2px", background: tone }} />
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ position: "relative", width: "12px", height: "12px", display: "inline-block" }}>
+      <span style={{ position: "absolute", inset: "1px", borderRadius: "3px", border: `1.5px solid ${tone}` }} />
+      <span style={{ position: "absolute", left: "2px", right: "2px", top: "4px", height: "1.5px", background: tone }} />
+    </span>
   );
 }

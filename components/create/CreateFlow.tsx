@@ -401,7 +401,7 @@ export default function CreateFlow() {
                   fontWeight: 700,
                   color: done ? "#000" : active ? "#a3e635" : "#555",
                 }}>
-                  {done ? "OK" : item.num}
+                  {done ? <StepDoneDot /> : item.num}
                 </div>
                 <span style={{ fontSize: "11px", fontWeight: active ? 700 : 500, color: active ? "#f0f0f0" : "#555" }}>
                   {item.label}
@@ -494,7 +494,9 @@ export default function CreateFlow() {
                   cursor: "pointer",
                 }}
               >
-                <div style={{ fontSize: "28px", marginBottom: "12px" }}>M</div>
+                <div style={{ marginBottom: "12px" }}>
+                  <EntryModeGlyph kind="manual" />
+                </div>
                 <div style={{ fontSize: "16px", fontWeight: 800, color: "#f0f0f0", marginBottom: "6px" }}>
                   Start manually
                 </div>
@@ -517,7 +519,9 @@ export default function CreateFlow() {
                   cursor: "pointer",
                 }}
               >
-                <div style={{ fontSize: "28px", marginBottom: "12px" }}>T</div>
+                <div style={{ marginBottom: "12px" }}>
+                  <EntryModeGlyph kind="template" />
+                </div>
                 <div style={{ fontSize: "16px", fontWeight: 800, color: "#f0f0f0", marginBottom: "6px" }}>
                   Start from a template
                 </div>
@@ -1465,6 +1469,61 @@ function StyleSection({ label, children }: { label: string; children: React.Reac
   );
 }
 
+function StepDoneDot() {
+  return (
+    <span style={{
+      width: "7px",
+      height: "7px",
+      borderRadius: "50%",
+      background: "#000",
+      display: "inline-block",
+    }} />
+  );
+}
+
+function EntryModeGlyph({ kind }: { kind: "manual" | "template" }) {
+  if (kind === "manual") {
+    return (
+      <span style={{
+        width: "36px",
+        height: "36px",
+        borderRadius: "12px",
+        border: "1px solid #314415",
+        background: "rgba(163,230,53,0.08)",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+      }}>
+        <span style={{ width: "16px", height: "2px", borderRadius: "999px", background: "#a3e635", position: "absolute", top: "11px" }} />
+        <span style={{ width: "20px", height: "2px", borderRadius: "999px", background: "#a3e635" }} />
+        <span style={{ width: "12px", height: "2px", borderRadius: "999px", background: "#a3e635", position: "absolute", bottom: "11px" }} />
+      </span>
+    );
+  }
+
+  return (
+    <span style={{
+      width: "36px",
+      height: "36px",
+      borderRadius: "12px",
+      border: "1px solid #252525",
+      background: "#151515",
+      display: "inline-grid",
+      gridTemplateColumns: "repeat(2, 9px)",
+      gridTemplateRows: "repeat(2, 9px)",
+      gap: "4px",
+      alignContent: "center",
+      justifyContent: "center",
+    }}>
+      <span style={{ borderRadius: "3px", background: "#f0f0f0" }} />
+      <span style={{ borderRadius: "3px", background: "#666" }} />
+      <span style={{ borderRadius: "3px", background: "#666" }} />
+      <span style={{ borderRadius: "3px", background: "#f0f0f0" }} />
+    </span>
+  );
+}
+
 function BtnGroup({ options, value, onChange }: {
   options: { key: string; label: string }[];
   value: string;
@@ -1555,7 +1614,7 @@ function buildCustomEventType(category: EventCategorySlug): EventType {
   return {
     id: `custom-${category}`,
     label: `Custom ${categoryMeta.label}`,
-    icon: "Custom",
+    icon: categoryMeta.icon,
     category,
     cardHeadline: "{{achievement}}",
     baseSummary: "{{name}} is sharing a custom update",

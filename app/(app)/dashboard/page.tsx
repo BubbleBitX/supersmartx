@@ -84,10 +84,10 @@ export default function DashboardPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "28px" }}>
         {[
-          { label: "Saved Items", value: timeline.length, icon: "S" },
-          { label: "This Month", value: thisMonthCount, icon: "M" },
-          { label: "Platforms Used", value: new Set(timeline.flatMap((event) => event.platforms)).size, icon: "P" },
-          { label: "Categories", value: new Set(timeline.map((event) => event.category)).size, icon: "C" },
+          { label: "Saved Items", value: timeline.length, icon: "stack" },
+          { label: "This Month", value: thisMonthCount, icon: "pulse" },
+          { label: "Platforms Used", value: new Set(timeline.flatMap((event) => event.platforms)).size, icon: "nodes" },
+          { label: "Categories", value: new Set(timeline.map((event) => event.category)).size, icon: "rings" },
         ].map((stat) => (
           <div key={stat.label} style={{
             background: "#111",
@@ -95,7 +95,10 @@ export default function DashboardPage() {
             borderRadius: "10px",
             padding: "16px 18px",
           }}>
-            <div style={{ fontSize: "11px", color: "#555", marginBottom: "4px" }}>{stat.icon} {stat.label}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "11px", color: "#555", marginBottom: "4px" }}>
+              <MetricGlyph kind={stat.icon} />
+              <span>{stat.label}</span>
+            </div>
             <div style={{ fontSize: "28px", fontWeight: 800, color: "#f0f0f0" }}>{stat.value}</div>
           </div>
         ))}
@@ -186,7 +189,9 @@ export default function DashboardPage() {
 
           {recent.length === 0 ? (
             <div style={{ textAlign: "center", padding: "30px 0", color: "#333" }}>
-              <div style={{ fontSize: "28px", marginBottom: "8px" }}>SW</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: "10px" }}>
+                <EmptyStateGlyph />
+              </div>
               <div style={{ fontSize: "12px" }}>No saved work yet</div>
               <div style={{ fontSize: "11px", color: "#2a2a2a", marginTop: "4px" }}>
                 Generate your first post to create a reusable history.
@@ -236,5 +241,75 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function MetricGlyph({ kind }: { kind: string }) {
+  if (kind === "stack") {
+    return (
+      <span style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+        {[0, 1, 2].map((item) => (
+          <span key={item} style={{ width: "10px", height: "2px", borderRadius: "999px", background: "#666" }} />
+        ))}
+      </span>
+    );
+  }
+
+  if (kind === "pulse") {
+    return (
+      <span style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "10px" }}>
+        <span style={{ width: "2px", height: "4px", borderRadius: "999px", background: "#666" }} />
+        <span style={{ width: "2px", height: "8px", borderRadius: "999px", background: "#666" }} />
+        <span style={{ width: "2px", height: "6px", borderRadius: "999px", background: "#666" }} />
+      </span>
+    );
+  }
+
+  if (kind === "nodes") {
+    return (
+      <span style={{ position: "relative", width: "12px", height: "10px", display: "inline-block" }}>
+        <span style={{ position: "absolute", left: "1px", top: "4px", width: "10px", height: "1.5px", background: "#666" }} />
+        {[0, 1, 2].map((item) => (
+          <span
+            key={item}
+            style={{
+              position: "absolute",
+              left: `${item * 4}px`,
+              top: "2px",
+              width: "4px",
+              height: "4px",
+              borderRadius: "50%",
+              background: "#666",
+            }}
+          />
+        ))}
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ position: "relative", width: "12px", height: "12px", display: "inline-block" }}>
+      <span style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1.5px solid #666" }} />
+      <span style={{ position: "absolute", inset: "3px", borderRadius: "50%", border: "1.5px solid #666" }} />
+    </span>
+  );
+}
+
+function EmptyStateGlyph() {
+  return (
+    <span style={{
+      width: "34px",
+      height: "34px",
+      borderRadius: "12px",
+      border: "1px dashed #2f2f2f",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+    }}>
+      <span style={{ width: "14px", height: "2px", borderRadius: "999px", background: "#2f2f2f", position: "absolute", top: "10px" }} />
+      <span style={{ width: "18px", height: "2px", borderRadius: "999px", background: "#2f2f2f" }} />
+      <span style={{ width: "12px", height: "2px", borderRadius: "999px", background: "#2f2f2f", position: "absolute", bottom: "10px" }} />
+    </span>
   );
 }
