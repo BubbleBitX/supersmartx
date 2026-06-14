@@ -383,6 +383,15 @@ export const CTA_STYLES = [
 ] as const;
 export type CtaStyle = typeof CTA_STYLES[number]["key"];
 
+export const BACKGROUND_PRESETS = [
+  { key: "aurora", label: "Aurora" },
+  { key: "studio", label: "Studio" },
+  { key: "blueprint", label: "Blueprint" },
+  { key: "sunrise", label: "Sunrise" },
+  { key: "grain", label: "Grain" },
+] as const;
+export type BackgroundPreset = typeof BACKGROUND_PRESETS[number]["key"];
+
 export const DOWNLOAD_FORMATS = [
   { key: "square",    label: "Universal",      width: 1080, height: 1080, displayW: 540, displayH: 540 },
   { key: "linkedin",  label: "LinkedIn Feed",  width: 1080, height: 1350, displayW: 432, displayH: 540 },

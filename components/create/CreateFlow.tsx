@@ -25,6 +25,7 @@ import {
 import { generatePlatformCaption, PlatformContent } from "@/lib/platforms/caption-engine";
 import {
   ACCENT_COLORS,
+  BACKGROUND_PRESETS,
   THEMES,
   TEMPLATES,
   LAYOUTS,
@@ -43,6 +44,7 @@ import {
   LogoPlacement,
   CtaStyle,
   DownloadFormat,
+  BackgroundPreset,
 } from "@/lib/templates";
 import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
 import { getCreateHrefForTemplateId, getEventTypeIdForTemplateId } from "@/lib/routing";
@@ -139,6 +141,9 @@ export default function CreateFlow() {
   const [fontPair, setFontPair] = useState<FontPair>("classic");
   const [logoPlacement, setLogoPlacement] = useState<LogoPlacement>("bottom");
   const [ctaStyle, setCtaStyle] = useState<CtaStyle>("follow");
+  const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>("aurora");
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
+  const [backgroundImageName, setBackgroundImageName] = useState<string | null>(null);
   const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>("square");
   const [voice, setVoice] = useState<Voice>("professional");
   const [mood, setMood] = useState<Mood>("achievement");
@@ -152,6 +157,7 @@ export default function CreateFlow() {
   const [copied, setCopied] = useState<string | null>(null);
 
   const cardRef = useRef<HTMLDivElement>(null);
+  const backgroundInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const syncProfile = () => {
@@ -183,13 +189,22 @@ export default function CreateFlow() {
     const validPlatforms = timelineEvent.platforms.filter((platform): platform is PlatformSlug =>
       PLATFORMS.some((candidate) => candidate.slug === platform)
     );
+    let cancelled = false;
 
-    setCategory(reusedEvent.category);
-    setEvent(reusedEvent);
-    setPlatforms(validPlatforms.length > 0 ? validPlatforms : DEFAULT_PLATFORMS);
-    setFormValues((current) => ({ ...current, ...timelineEvent.values }));
-    setActivePlatformTab(validPlatforms[0] || "linkedin");
-    setStep("form");
+    queueMicrotask(() => {
+      if (cancelled) return;
+
+      setCategory(reusedEvent.category);
+      setEvent(reusedEvent);
+      setPlatforms(validPlatforms.length > 0 ? validPlatforms : DEFAULT_PLATFORMS);
+      setFormValues((current) => ({ ...current, ...timelineEvent.values }));
+      setActivePlatformTab(validPlatforms[0] || "linkedin");
+      setStep("form");
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [reuseEventId]);
 
   const handleFormBack = () => {
@@ -334,6 +349,20 @@ export default function CreateFlow() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const handleBackgroundUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      setBackgroundImageUrl(reader.result);
+      setBackgroundImageName(file.name);
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
   const cardProps = {
     name: formValues.name || profile.name || "",
     profession: formValues.role || profile.role || "",
@@ -350,6 +379,8 @@ export default function CreateFlow() {
     fontPair,
     logoPlacement,
     ctaStyle,
+    backgroundPreset,
+    backgroundImageUrl,
     downloadFormat,
     watermark,
     cardRef,
@@ -435,10 +466,10 @@ export default function CreateFlow() {
               }}>
                 <div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: "#f0f0f0", marginBottom: "4px" }}>
-                    Complete your brand profile for stronger previews
+                    Complete your profile once for faster milestone posts
                   </div>
                   <div style={{ fontSize: "11px", color: "#666", lineHeight: 1.55 }}>
-                    {profileCompletionPct}% complete. Photo, role, company, and brand details improve autofill and final output quality.
+                    {profileCompletionPct}% complete. Photo, role, company, and brand details auto-fill future posts and improve final output quality.
                   </div>
                 </div>
                 <button
@@ -454,7 +485,7 @@ export default function CreateFlow() {
                     cursor: "pointer",
                   }}
                 >
-                  Complete Brand Profile
+                  Complete Profile Setup
                 </button>
               </div>
             )}
@@ -472,13 +503,13 @@ export default function CreateFlow() {
                 fontWeight: 700,
                 marginBottom: "14px",
               }}>
-                Quick Start
+                LinkedIn-first start
               </div>
               <h2 style={{ fontSize: "28px", fontWeight: 800, color: "#f0f0f0", margin: "0 0 8px", letterSpacing: "-0.04em" }}>
-                Choose how you want to create
+                Choose your next milestone
               </h2>
               <p style={{ fontSize: "14px", color: "#666", margin: 0, lineHeight: 1.65, maxWidth: "720px" }}>
-                Start from a proven template for speed, or build from category if you want more control over the event structure.
+                Start from a career template for speed, or build from category when you want more control over the event structure.
               </p>
             </div>
 
@@ -501,10 +532,10 @@ export default function CreateFlow() {
                   Start manually
                 </div>
                 <div style={{ fontSize: "12px", color: "#666", lineHeight: 1.6, marginBottom: "12px" }}>
-                  Pick a category, choose the exact event type, then generate platform-aware content.
+                  Pick the exact milestone you want to post, then generate LinkedIn-first content with platform variants.
                 </div>
                 <div style={{ fontSize: "11px", color: "#a3e635", fontWeight: 700 }}>
-                  Best for custom announcements and flexible workflows {"->"}
+                  Best for career milestones and flexible workflows {"->"}
                 </div>
               </button>
 
@@ -526,10 +557,10 @@ export default function CreateFlow() {
                   Start from a template
                 </div>
                 <div style={{ fontSize: "12px", color: "#666", lineHeight: 1.6, marginBottom: "12px" }}>
-                  Use a ready-made structure like hackathon selection, product launch, certification, or newsletter.
+                  Use a ready-made structure for promotions, certifications, open-to-work posts, launches, and more.
                 </div>
                 <div style={{ fontSize: "11px", color: "#60a5fa", fontWeight: 700 }}>
-                  Best for faster creation with less setup {"->"}
+                  Best for faster creation with less typing {"->"}
                 </div>
               </button>
             </div>
@@ -585,7 +616,7 @@ export default function CreateFlow() {
                     Featured Templates
                   </div>
                   <div style={{ fontSize: "12px", color: "#666" }}>
-                    Templates are the fastest path inside Create when you already know the post format.
+                    Templates are the fastest path when you already know the milestone format you want to post.
                   </div>
                 </div>
                 <button
@@ -867,8 +898,13 @@ export default function CreateFlow() {
                 <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#f0f0f0", margin: 0 }}>
                   {selectedEvent.icon} {selectedEvent.label}
                 </h2>
-                <p style={{ fontSize: "12px", color: "#555", margin: "2px 0 0" }}>Fill in the details</p>
+                <p style={{ fontSize: "12px", color: "#555", margin: "2px 0 0" }}>Details</p>
               </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "-8px", marginBottom: "12px" }}>
+              <button onClick={() => router.push("/profile")} style={secondaryActionButtonStyle}>
+                {profileCompletionPct < 100 ? "Complete Profile" : "Update Profile"}
+              </button>
             </div>
             <div style={{
               background: "#111",
@@ -885,11 +921,11 @@ export default function CreateFlow() {
               <div style={{ fontSize: "11px", color: "#666", lineHeight: 1.55 }}>
                 {hasMissingRequiredFields
                   ? missingRequiredFields.map((field) => field.label).join(" / ")
-                  : "You can move to style now. Name, role, and company are auto-filled from your profile when available."}
+                  : "Ready for style."}
               </div>
               {profileSeededCount > 0 && (
                 <div style={{ fontSize: "10px", color: "#555", marginTop: "8px" }}>
-                  {profileSeededCount} field{profileSeededCount > 1 ? "s were" : " was"} auto-filled from your profile.
+                  {profileSeededCount} field{profileSeededCount > 1 ? "s" : ""} auto-filled.
                 </div>
               )}
             </div>
@@ -960,8 +996,14 @@ export default function CreateFlow() {
                 </button>
                 <div>
                   <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#f0f0f0", margin: 0 }}>Customize the Style</h2>
-                  <p style={{ fontSize: "12px", color: "#555", margin: "2px 0 0" }}>One-click customization</p>
+                  <p style={{ fontSize: "12px", color: "#555", margin: "2px 0 0" }}>Style</p>
                 </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "-2px" }}>
+                <button onClick={() => router.push("/profile")} style={secondaryActionButtonStyle}>
+                  {profileCompletionPct < 100 ? "Complete Profile" : "Update Profile"}
+                </button>
               </div>
 
               <StyleSection label="Voice">
@@ -991,6 +1033,42 @@ export default function CreateFlow() {
                       }}
                     />
                   ))}
+                </div>
+              </StyleSection>
+              <StyleSection label="Background">
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <BtnGroup
+                    options={BACKGROUND_PRESETS.map((item) => ({ key: item.key, label: item.label }))}
+                    value={backgroundPreset}
+                    onChange={(value) => setBackgroundPreset(value as BackgroundPreset)}
+                  />
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                    <button onClick={() => backgroundInputRef.current?.click()} style={secondaryActionButtonStyle}>
+                      Upload Background
+                    </button>
+                    {backgroundImageUrl && (
+                      <button
+                        onClick={() => {
+                          setBackgroundImageUrl(null);
+                          setBackgroundImageName(null);
+                        }}
+                        style={tertiaryActionButtonStyle}
+                      >
+                        Clear Upload
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={backgroundInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBackgroundUpload}
+                    style={{ display: "none" }}
+                  />
+                  <div style={{ fontSize: "10px", color: "#666", lineHeight: 1.55 }}>
+                    Pick one or upload your own.
+                    {backgroundImageName ? ` Using: ${backgroundImageName}` : ""}
+                  </div>
                 </div>
               </StyleSection>
               <StyleSection label="Layout">
@@ -1647,6 +1725,28 @@ const primaryButtonStyle: React.CSSProperties = {
   fontWeight: 700,
   borderRadius: "8px",
   border: "none",
+  cursor: "pointer",
+};
+
+const secondaryActionButtonStyle: React.CSSProperties = {
+  padding: "8px 14px",
+  background: "#161616",
+  color: "#f0f0f0",
+  fontSize: "12px",
+  fontWeight: 700,
+  borderRadius: "8px",
+  border: "1px solid #2a2a2a",
+  cursor: "pointer",
+};
+
+const tertiaryActionButtonStyle: React.CSSProperties = {
+  padding: "8px 14px",
+  background: "#111",
+  color: "#888",
+  fontSize: "12px",
+  fontWeight: 600,
+  borderRadius: "8px",
+  border: "1px solid #2a2a2a",
   cursor: "pointer",
 };
 

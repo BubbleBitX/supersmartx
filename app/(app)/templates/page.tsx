@@ -7,10 +7,10 @@ import { TEMPLATES, TemplateCategory } from "@/lib/templates";
 
 const CATEGORY_META: Record<TemplateCategory, { label: string; color: string; desc: string }> = {
   achievement: { label: "Achievement", color: "#a3e635", desc: "Hackathons, awards, certifications, and promotions" },
-  career: { label: "Career", color: "#60a5fa", desc: "New roles, open-to-work, and professional updates" },
+  career: { label: "Career", color: "#60a5fa", desc: "Promotions, new roles, internships, and open-to-work posts" },
   founder: { label: "Founder", color: "#fb923c", desc: "Launches, traction, revenue, and startup milestones" },
   creator: { label: "Creator", color: "#c084fc", desc: "Audience growth, channels, and creator launches" },
-  events: { label: "Events", color: "#2dd4bf", desc: "Talks, webinars, and speaker announcements" },
+  events: { label: "Events", color: "#2dd4bf", desc: "Talks, webinars, and speaker milestones" },
   newsletter: { label: "Newsletter", color: "#f87171", desc: "Publishing, subscriber growth, and issue launches" },
 };
 
@@ -42,7 +42,7 @@ export default function TemplatesPage() {
               Template Library
             </h1>
             <p style={{ fontSize: "13px", color: "#555", margin: 0, maxWidth: "620px", lineHeight: 1.6 }}>
-              Fast-start structures inside Create. Pick a template when you already know the post format and want less setup.
+              Fast-start structures for promotions, certifications, open-to-work updates, and other milestone posts.
             </p>
           </div>
         </div>

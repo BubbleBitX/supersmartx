@@ -16,17 +16,17 @@ export async function POST(req: NextRequest) {
   const { data, error } = await resend.emails.send({
     from: "SuperSmartX <hello@gozero2one.com>",
     to: email,
-    subject: "Welcome to SuperSmartX 🏆",
+    subject: "Welcome to SuperSmartX",
     html: `
       <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#111">
-        <h1 style="font-size:24px;font-weight:800;margin:0 0 8px">Welcome, ${name || "there"}! 👋</h1>
+        <h1 style="font-size:24px;font-weight:800;margin:0 0 8px">Welcome, ${name || "there"}!</h1>
         <p style="font-size:15px;color:#444;line-height:1.6;margin:0 0 20px">
-          You are now on <strong>SuperSmartX</strong> — create professional personal-branding graphics and announcement assets in minutes.
+          You are now on <strong>SuperSmartX</strong> - create LinkedIn-ready career milestone graphics and captions in minutes.
         </p>
         <a href="https://gozero2one.com" style="display:inline-block;padding:12px 24px;background:#a3e635;color:#000;font-size:14px;font-weight:700;border-radius:8px;text-decoration:none">
-          Create Your First Graphic
+          Create Your First Career Post
         </a>
-        <p style="font-size:12px;color:#999;margin-top:32px">SuperSmartX · Pune, India</p>
+        <p style="font-size:12px;color:#999;margin-top:32px">SuperSmartX | Pune, India</p>
       </div>
     `,
   });

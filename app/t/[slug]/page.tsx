@@ -17,11 +17,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!template) return {};
 
   return {
-    title: `${template.name} Graphic Generator - SuperSmartX`,
-    description: `Create a professional ${template.name.toLowerCase()} announcement graphic and platform-ready copy in minutes.`,
+    title: `${template.name} LinkedIn Post Generator - SuperSmartX`,
+    description: `Create a LinkedIn-ready ${template.name.toLowerCase()} graphic and caption in minutes.`,
     openGraph: {
-      title: `${template.name} Graphic Generator`,
-      description: `Create a professional ${template.name.toLowerCase()} announcement asset instantly.`,
+      title: `${template.name} LinkedIn Post Generator`,
+      description: `Create a LinkedIn-ready ${template.name.toLowerCase()} asset instantly.`,
       type: "website",
     },
     alternates: {
@@ -54,11 +54,11 @@ export default function TemplateSEOPage({ params }: Props) {
         <div style={{ marginTop: "24px", marginBottom: "32px" }}>
           <div style={{ fontSize: "40px", marginBottom: "12px" }}>{template.icon}</div>
           <h1 style={{ fontSize: "30px", fontWeight: 800, color: "#f5f5f5", margin: "0 0 8px", letterSpacing: "-0.5px" }}>
-            {template.name} Graphic Generator
+            {template.name} LinkedIn Post Generator
           </h1>
           <p style={{ fontSize: "15px", color: "#666", margin: 0, lineHeight: 1.6 }}>
-            Create a professional {template.name.toLowerCase()} announcement asset in minutes.
-            Fill the form, customize the style, and export platform-ready output.
+            Create a LinkedIn-ready {template.name.toLowerCase()} graphic and caption in minutes.
+            Fill the form, customize the style, and export platform-specific output.
           </p>
         </div>
 

@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SuperSmartX - Personal Branding Announcements",
-  description: "Create professional personal-branding posts, announcement graphics, and platform-ready milestone assets in minutes.",
+  title: "SuperSmartX - LinkedIn milestone posts for career updates",
+  description: "Create LinkedIn-ready graphics and captions for promotions, job changes, certifications, internships, and other career milestones. Set up your profile once, then reuse it forever.",
   openGraph: {
-    title: "SuperSmartX",
-    description: "Create platform-ready announcement graphics and personal branding assets instantly",
+    title: "SuperSmartX | LinkedIn milestone posts",
+    description: "Set up your profile once and turn career milestones into LinkedIn-ready graphics and captions.",
     type: "website",
   },
 };

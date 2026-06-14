@@ -131,16 +131,16 @@ export default function ProfilePage() {
   const previewAccent = profile.brandColor || "#a3e635";
   const previewTheme = getPreviewTheme(profile.brandTheme, previewAccent);
   const previewName = profile.name || "Your Name";
-  const previewRole = profile.headline || profile.role || "Your professional headline";
+  const previewRole = profile.headline || profile.role || "Your next career headline";
   const previewCompany = profile.company || "Your company or organization";
   const previewSocials = SOCIAL_FIELDS
     .map((field) => ({ label: field.label, value: (profile.social as Record<string, string>)[field.key] || "" }))
     .filter((item) => item.value);
-  const previewStatement = profile.headline || profile.bio || "Your professional headline";
+  const previewStatement = profile.headline || profile.bio || "Your next LinkedIn-ready career update";
   const previewEyebrow = profile.company
     ? `PROFILE FOR ${profile.company.toUpperCase()}`
-    : "PERSONAL BRAND PREVIEW";
-  const previewFooterPrimary = profile.company || "SuperSmartX";
+    : "PROFILE ONCE, POST FOREVER";
+  const previewFooterPrimary = profile.company || "Career Milestone";
   const previewFooterSecondary = stripUrlDisplay(profile.website || previewSocials[0]?.value || "brand-preview");
 
   const inputStyle: React.CSSProperties = {
@@ -162,10 +162,10 @@ export default function ProfilePage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", flexWrap: "wrap", marginBottom: "28px" }}>
         <div>
           <h1 style={{ fontSize: "22px", fontWeight: 800, color: "#f0f0f0", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
-            Brand Profile
+            Profile Setup
           </h1>
           <p style={{ fontSize: "13px", color: "#555", margin: 0 }}>
-            Set this up once to improve autofill, previews, and final output quality everywhere in Create.
+            Set this up once. Every promotion, certification, new role, or open-to-work post starts with your saved details already in place.
           </p>
         </div>
         <button onClick={handleSave} style={{
@@ -176,7 +176,7 @@ export default function ProfilePage() {
           borderRadius: "8px", border: saved ? "1px solid #a3e635" : "none",
           cursor: "pointer", transition: "all 0.2s",
         }}>
-          {saved ? "Saved!" : "Save Brand Profile"}
+          {saved ? "Saved!" : "Save Profile Setup"}
         </button>
       </div>
 
@@ -459,7 +459,7 @@ export default function ProfilePage() {
                   backdropFilter: "blur(14px)",
                 }}>
                   <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: previewAccent, display: "inline-block" }} />
-                  SuperSmartX Preview
+                  Profile Once Preview
                 </div>
                 {profile.logoUrl ? (
                   <div style={{
@@ -589,7 +589,7 @@ export default function ProfilePage() {
             </div>
           </div>
           <div style={{ marginTop: "12px", fontSize: "11px", color: "#444", lineHeight: 1.6 }}>
-            This preview now reflects your photo, name, role, company, accent color, and brand theme in a poster-style layout.
+            This preview reflects the details that will auto-fill into every future post you generate.
           </div>
         </div>
 

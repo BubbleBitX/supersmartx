@@ -1,6 +1,14 @@
 # SuperSmartX
 
-Personal branding announcement platform for turning milestones into polished, platform-aware post assets.
+LinkedIn-first milestone posting tool for turning career updates into polished graphics and platform-aware captions.
+
+## Positioning
+
+SuperSmartX leads with one clear promise:
+
+- set up your profile once
+- turn promotions, job changes, certifications, internships, and open-to-work updates into LinkedIn-ready posts quickly
+- reuse the same milestone details across multiple platforms with caption logic tuned to each destination
 
 ## What it does
 
@@ -26,7 +34,7 @@ Primary IA:
 - `Dashboard` for overview and recent saved work
 - `Create` as the single creation hub
 - `Saved Work` for reuse and cleanup
-- `Brand Profile` for autofill and preview quality
+- `Profile Setup` for autofill and preview quality
 - `Template Library` as a fast-start mode inside the create system
 
 Manual flow:

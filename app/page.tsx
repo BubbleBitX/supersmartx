@@ -2,10 +2,10 @@ import Link from "next/link";
 import styles from "./page.module.css";
 
 const STATS = [
-  { label: "Templates", value: "10+" },
-  { label: "Design Variations", value: "2700+" },
-  { label: "Creation Time", value: "60 sec" },
-  { label: "Exports", value: "Unlimited" },
+  { label: "Profile Setup", value: "Once" },
+  { label: "Career Templates", value: "10+" },
+  { label: "Platform Variants", value: "12" },
+  { label: "First Draft", value: "60 sec" },
 ];
 
 export default function RootPage() {
@@ -32,21 +32,22 @@ export default function RootPage() {
         <div className={styles.hero}>
           <div className={styles.copy}>
             <div className={styles.eyebrow}>
-              Turn achievements into branded assets
+              The LinkedIn milestone tool
             </div>
             <h1 className={styles.title}>
-              Create professional achievement posts in 60 seconds
+              Set up once. Post every career win beautifully.
             </h1>
             <p className={styles.description}>
-              Generate polished graphics, platform-ready captions, and personal branding
-              content from one fast workflow.
+              Turn promotions, new jobs, certifications, internships, and open-to-work
+              updates into LinkedIn-ready graphics and captions. Your saved profile fills
+              the details in every time.
             </p>
             <div className={styles.ctaRow}>
               <Link href="/create" className={styles.primaryCta}>
-                Start Creating Free
+                Create Your First Post
               </Link>
               <Link href="/templates" className={styles.secondaryCta}>
-                View Templates
+                Browse Templates
               </Link>
             </div>
             <div className={styles.stats}>
@@ -63,25 +64,25 @@ export default function RootPage() {
             <div className={styles.previewTop}>
               <div>
                 <div className={styles.previewLabel}>Live Preview</div>
-                <div className={styles.previewTitle}>Hackathon Selected</div>
+                <div className={styles.previewTitle}>Career Milestone</div>
               </div>
-              <div className={styles.previewBadge}>LinkedIn Ready</div>
+              <div className={styles.previewBadge}>Profile Once</div>
             </div>
 
             <div className={styles.previewCard}>
-              <div className={styles.previewCardLabel}>Achievement</div>
+              <div className={styles.previewCardLabel}>LinkedIn First</div>
               <div className={styles.previewCardTitle}>
-                Selected for OpenAI x Outskill AI Builders Hackathon
+                Promoted to Senior Software Engineer
               </div>
               <div className={styles.previewCardCopy}>
-                Building an AI researcher for startups with platform-ready captions and
-                exportable social graphics.
+                One saved profile becomes a polished graphic, a thoughtful LinkedIn
+                caption, and shorter variants for every other platform.
               </div>
               <div className={styles.previewPerson}>
                 <div className={styles.previewAvatar} />
                 <div>
-                  <div className={styles.previewName}>Your Name</div>
-                  <div className={styles.previewRole}>Software Engineer</div>
+                  <div className={styles.previewName}>Priya Sharma</div>
+                  <div className={styles.previewRole}>Software Engineer at Razorpay</div>
                 </div>
               </div>
             </div>
@@ -90,13 +91,13 @@ export default function RootPage() {
               <div className={styles.previewInfoCard}>
                 <div className={styles.previewInfoLabel}>Output</div>
                 <div className={styles.previewInfoCopy}>
-                  1080x1080 PNG, LinkedIn caption, multi-platform copy
+                  LinkedIn graphic, caption, and platform-aware variants
                 </div>
               </div>
               <div className={styles.previewInfoCard}>
                 <div className={styles.previewInfoLabel}>Flow</div>
                 <div className={styles.previewInfoCopy}>
-                  Choose event type, fill details, customize theme, export instantly
+                  Save profile once, choose the milestone, export in minutes
                 </div>
               </div>
             </div>

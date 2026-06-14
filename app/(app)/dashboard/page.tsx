@@ -1,9 +1,10 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { EVENT_CATEGORIES } from "@/lib/events/categories";
-import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
+import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, UserProfile } from "@/lib/profile";
 import { loadTimeline, TimelineEvent, TIMELINE_UPDATED_EVENT } from "@/lib/timeline";
 
 export default function DashboardPage() {
@@ -25,291 +26,300 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const steps = profileCompletionSteps(profile);
-  const completedSteps = steps.filter((step) => step.done).length;
-  const pct = Math.round((completedSteps / steps.length) * 100);
-  const recent = timeline.slice(0, 4);
   const firstName = profile.name.split(" ").filter(Boolean)[0];
-  const isNew = !profile.name;
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - 30);
-  const thisMonthCount = timeline.filter((event) => new Date(event.createdAt) > cutoffDate).length;
+  const recent = timeline.slice(0, 4);
+  const latestEvent = recent[0] ?? null;
+  const recentMonth = new Date();
+  recentMonth.setDate(recentMonth.getDate() - 30);
+
+  const stats = [
+    { label: "Saved workspaces", value: timeline.length },
+    { label: "Created this month", value: timeline.filter((event) => new Date(event.createdAt) > recentMonth).length },
+    { label: "Platforms used", value: new Set(timeline.flatMap((event) => event.platforms)).size },
+  ];
 
   return (
-    <div style={{ padding: "28px 32px", maxWidth: "1080px" }}>
-      <div style={{ marginBottom: "28px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: 800, color: "#f0f0f0", margin: "0 0 4px", letterSpacing: "-0.5px" }}>
-          {isNew ? "Welcome to SuperSmartX" : `Welcome back${firstName ? `, ${firstName}` : ""}`}
+    <div style={{ padding: "30px clamp(18px, 3vw, 34px) 42px", maxWidth: "960px" }}>
+      <div style={{ marginBottom: "24px" }}>
+        <div style={eyebrowStyle}>Workspace</div>
+        <h1 style={pageTitleStyle}>
+          {firstName ? `What do you want to publish next, ${firstName}?` : "What do you want to publish next?"}
         </h1>
-        <p style={{ fontSize: "14px", color: "#555", margin: 0 }}>
-          Create from one clear hub, then keep every draft and final output in saved work.
-        </p>
+        <p style={pageCopyStyle}>Pick one starting point.</p>
       </div>
 
-      {pct < 100 && (
-        <div style={{
-          background: "#111",
-          border: "1px solid #1e1e1e",
-          borderLeft: "3px solid #a3e635",
-          borderRadius: "10px",
-          padding: "16px 20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "14px",
-          flexWrap: "wrap",
-          marginBottom: "24px",
-        }}>
-          <div>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "#f0f0f0", marginBottom: "2px" }}>
-              Complete your brand profile - {pct}% done
-            </div>
-            <div style={{ fontSize: "12px", color: "#666" }}>
-              {steps.find((step) => !step.done)?.label} to improve autofill, previews, and output quality
-            </div>
-          </div>
-          <Link href="/profile" style={{
-            padding: "7px 14px",
-            background: "#a3e635",
-            color: "#000",
-            fontSize: "12px",
-            fontWeight: 700,
-            borderRadius: "7px",
-            textDecoration: "none",
-          }}>
-            Complete Brand Profile
-          </Link>
+      <section style={{ ...cardStyle, padding: "24px", marginBottom: "18px" }}>
+        <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#7f796f", marginBottom: "10px" }}>
+          Start here
         </div>
-      )}
+        <div style={{ fontSize: "26px", fontWeight: 800, color: "#f3efe6", lineHeight: 1.08, marginBottom: "10px", maxWidth: "12ch" }}>
+          Three easy ways to begin
+        </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "28px" }}>
-        {[
-          { label: "Saved Items", value: timeline.length, icon: "stack" },
-          { label: "This Month", value: thisMonthCount, icon: "pulse" },
-          { label: "Platforms Used", value: new Set(timeline.flatMap((event) => event.platforms)).size, icon: "nodes" },
-          { label: "Categories", value: new Set(timeline.map((event) => event.category)).size, icon: "rings" },
-        ].map((stat) => (
-          <div key={stat.label} style={{
-            background: "#111",
-            border: "1px solid #1a1a1a",
-            borderRadius: "10px",
-            padding: "16px 18px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "11px", color: "#555", marginBottom: "4px" }}>
-              <MetricGlyph kind={stat.icon} />
-              <span>{stat.label}</span>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "12px" }}>
+          <ActionCard
+            href="/create"
+            title="Start manually"
+            label="Flexible"
+            copy="Choose the event yourself."
+            accent="rgba(182,245,77,0.14)"
+            border="rgba(182,245,77,0.22)"
+          />
+          <ActionCard
+            href="/templates"
+            title="Use a template"
+            label="Fastest"
+            copy="Start from a ready-made format."
+            accent="rgba(255,255,255,0.04)"
+            border="rgba(255,255,255,0.08)"
+          />
+          <ActionCard
+            href={latestEvent ? `/create?reuse=${encodeURIComponent(latestEvent.id)}` : "/profile"}
+            title={latestEvent ? "Reuse latest workspace" : "Finish profile setup"}
+            label={latestEvent ? "Reuse" : "Setup"}
+            copy={
+              latestEvent
+                ? `${latestEvent.eventTypeLabel} is already saved.`
+                : "Save your core details once."
+            }
+            accent="rgba(241,199,109,0.10)"
+            border="rgba(241,199,109,0.18)"
+          />
+        </div>
+      </section>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "18px" }}>
+        {stats.map((stat) => (
+          <div key={stat.label} style={{ ...softCardStyle, padding: "16px 18px" }}>
+            <div style={{ fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#7a756c", marginBottom: "8px" }}>
+              {stat.label}
             </div>
-            <div style={{ fontSize: "28px", fontWeight: 800, color: "#f0f0f0" }}>{stat.value}</div>
+            <div style={{ fontSize: "30px", fontWeight: 800, color: "#f3efe6" }}>{stat.value}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
-        <div style={{
-          background: "#111",
-          border: "1px solid #1a1a1a",
-          borderRadius: "12px",
-          padding: "20px",
-        }}>
-          <div style={{ fontSize: "11px", letterSpacing: "2px", color: "#555", textTransform: "uppercase", marginBottom: "10px" }}>
-            Create Hub
-          </div>
-          <div style={{ fontSize: "18px", fontWeight: 800, color: "#f0f0f0", marginBottom: "6px" }}>
-            Start from one place
-          </div>
-          <div style={{ fontSize: "12px", color: "#666", lineHeight: 1.6, marginBottom: "16px" }}>
-            Use Create for manual flows, templates, platform-aware sizing, and final post preview.
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginBottom: "16px" }}>
-            <Link href="/create" style={{
-              textDecoration: "none",
-              background: "linear-gradient(180deg, rgba(163,230,53,0.10) 0%, #141414 100%)",
-              border: "1px solid #314415",
-              borderRadius: "10px",
-              padding: "14px",
-            }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#f0f0f0", marginBottom: "6px" }}>Manual Start</div>
-              <div style={{ fontSize: "11px", color: "#666", lineHeight: 1.5 }}>
-                Choose category, event type, platforms, and details from scratch.
-              </div>
-            </Link>
-            <Link href="/templates" style={{
-              textDecoration: "none",
-              background: "#141414",
-              border: "1px solid #1e1e1e",
-              borderRadius: "10px",
-              padding: "14px",
-            }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#f0f0f0", marginBottom: "6px" }}>Fast Template Start</div>
-              <div style={{ fontSize: "11px", color: "#666", lineHeight: 1.5 }}>
-                Jump into a structured format when you already know the post style.
-              </div>
-            </Link>
-          </div>
-
-          <div style={{ fontSize: "10px", letterSpacing: "2px", color: "#555", textTransform: "uppercase", marginBottom: "10px" }}>
-            Quick Shortcuts
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "8px" }}>
-            {EVENT_CATEGORIES.slice(0, 6).map((category) => (
-              <Link key={category.slug} href={`/create?category=${category.slug}`} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                background: "#161616",
-                border: "1px solid #1e1e1e",
-                textDecoration: "none",
-              }}>
-                <span style={{ fontSize: "16px" }}>{category.icon}</span>
-                <span style={{ fontSize: "11px", fontWeight: 600, color: "#ccc" }}>{category.label}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div style={{
-          background: "#111",
-          border: "1px solid #1a1a1a",
-          borderRadius: "12px",
-          padding: "20px",
-        }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "18px" }}>
+        <section style={{ ...cardStyle, padding: "22px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "14px", flexWrap: "wrap" }}>
-            <div style={{ fontSize: "11px", letterSpacing: "2px", color: "#555", textTransform: "uppercase" }}>
-              Recent Saved Work
+            <div>
+              <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#7f796f", marginBottom: "6px" }}>
+                Recent workspaces
+              </div>
+              <div style={{ fontSize: "22px", fontWeight: 800, color: "#f3efe6" }}>
+                Continue from saved work
+              </div>
             </div>
             {timeline.length > 0 && (
-              <Link href="/timeline" style={{ fontSize: "11px", color: "#a3e635", textDecoration: "none" }}>
-                Open Saved Work
+              <Link href="/timeline" style={ghostLinkStyle}>
+                Open saved work
               </Link>
             )}
           </div>
 
           {recent.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "30px 0", color: "#333" }}>
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: "10px" }}>
-                <EmptyStateGlyph />
-              </div>
-              <div style={{ fontSize: "12px" }}>No saved work yet</div>
-              <div style={{ fontSize: "11px", color: "#2a2a2a", marginTop: "4px" }}>
-                Generate your first post to create a reusable history.
-              </div>
+            <div style={{ ...softCardStyle, padding: "24px", textAlign: "center" }}>
+              <div style={{ fontSize: "17px", fontWeight: 700, color: "#f3efe6", marginBottom: "6px" }}>No workspaces yet</div>
+              <div style={{ fontSize: "13px", color: "#8f8a81", lineHeight: 1.7, marginBottom: "16px" }}>Your first generated post will appear here.</div>
+              <Link href="/create" style={primaryLinkStyle}>
+                Create your first post
+              </Link>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ display: "grid", gap: "10px" }}>
               {recent.map((event) => (
-                <div key={event.id} style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  background: "#161616",
-                  border: "1px solid #1e1e1e",
-                  flexWrap: "wrap",
-                }}>
-                  <span style={{ fontSize: "18px", flexShrink: 0 }}>{event.eventTypeIcon}</span>
-                  <div style={{ flex: 1, minWidth: "180px" }}>
-                    <div style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#e0e0e0",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}>
-                      {event.title}
-                    </div>
-                    <div style={{ fontSize: "10px", color: "#555", marginTop: "2px" }}>
-                      {event.platforms.join(" / ")} / {new Date(event.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                    </div>
+                <Link
+                  key={event.id}
+                  href={`/create?reuse=${encodeURIComponent(event.id)}`}
+                  style={{ ...softCardStyle, padding: "14px 15px", textDecoration: "none", color: "inherit" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "18px" }}>{event.eventTypeIcon}</span>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#f3efe6", lineHeight: 1.35 }}>{event.title}</span>
                   </div>
-                  <Link href={`/create?reuse=${encodeURIComponent(event.id)}`} style={{
-                    fontSize: "10px",
-                    color: "#a3e635",
-                    textDecoration: "none",
-                    fontWeight: 700,
-                  }}>
-                    Reuse
-                  </Link>
-                </div>
+                  <div style={{ fontSize: "11px", color: "#89847a" }}>
+                    {event.platforms.join(" / ")} · {formatDate(event.createdAt)}
+                  </div>
+                </Link>
               ))}
             </div>
           )}
-        </div>
+        </section>
+
+        <section style={{ ...cardStyle, padding: "22px" }}>
+          <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#7f796f", marginBottom: "8px" }}>
+            Quick starts
+          </div>
+          <div style={{ fontSize: "22px", fontWeight: 800, color: "#f3efe6", marginBottom: "8px" }}>
+            Start from a familiar lane
+          </div>
+          <div style={{ display: "grid", gap: "10px" }}>
+            {EVENT_CATEGORIES.slice(0, 6).map((category) => (
+              <Link
+                key={category.slug}
+                href={`/create?category=${category.slug}`}
+                style={{
+                  ...softCardStyle,
+                  padding: "13px 14px",
+                  textDecoration: "none",
+                  color: "inherit",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    width: "34px",
+                    height: "34px",
+                    borderRadius: "12px",
+                    background: `${category.color}18`,
+                    border: `1px solid ${category.color}32`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "17px",
+                    flexShrink: 0,
+                  }}
+                >
+                  {category.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#f3efe6", marginBottom: "2px" }}>{category.label}</div>
+                  <div style={{ fontSize: "11px", color: "#8f8a81", lineHeight: 1.55 }}>{shortCategoryDescription(category.description)}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
 }
 
-function MetricGlyph({ kind }: { kind: string }) {
-  if (kind === "stack") {
-    return (
-      <span style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-        {[0, 1, 2].map((item) => (
-          <span key={item} style={{ width: "10px", height: "2px", borderRadius: "999px", background: "#666" }} />
-        ))}
-      </span>
-    );
-  }
-
-  if (kind === "pulse") {
-    return (
-      <span style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "10px" }}>
-        <span style={{ width: "2px", height: "4px", borderRadius: "999px", background: "#666" }} />
-        <span style={{ width: "2px", height: "8px", borderRadius: "999px", background: "#666" }} />
-        <span style={{ width: "2px", height: "6px", borderRadius: "999px", background: "#666" }} />
-      </span>
-    );
-  }
-
-  if (kind === "nodes") {
-    return (
-      <span style={{ position: "relative", width: "12px", height: "10px", display: "inline-block" }}>
-        <span style={{ position: "absolute", left: "1px", top: "4px", width: "10px", height: "1.5px", background: "#666" }} />
-        {[0, 1, 2].map((item) => (
-          <span
-            key={item}
-            style={{
-              position: "absolute",
-              left: `${item * 4}px`,
-              top: "2px",
-              width: "4px",
-              height: "4px",
-              borderRadius: "50%",
-              background: "#666",
-            }}
-          />
-        ))}
-      </span>
-    );
-  }
-
+function ActionCard({
+  href,
+  title,
+  label,
+  copy,
+  accent,
+  border,
+}: {
+  href: string;
+  title: string;
+  label: string;
+  copy: string;
+  accent: string;
+  border: string;
+}) {
   return (
-    <span style={{ position: "relative", width: "12px", height: "12px", display: "inline-block" }}>
-      <span style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1.5px solid #666" }} />
-      <span style={{ position: "absolute", inset: "3px", borderRadius: "50%", border: "1.5px solid #666" }} />
-    </span>
+    <Link
+      href={href}
+      style={{
+        textDecoration: "none",
+        color: "inherit",
+        padding: "16px",
+        borderRadius: "18px",
+        background: `linear-gradient(180deg, ${accent} 0%, rgba(255,255,255,0.02) 100%)`,
+        border: `1px solid ${border}`,
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "176px",
+      }}
+    >
+      <div style={{ fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#857f75", marginBottom: "10px" }}>
+        {label}
+      </div>
+      <div style={{ fontSize: "18px", fontWeight: 700, color: "#f3efe6", marginBottom: "8px", lineHeight: 1.2 }}>{title}</div>
+      <div style={{ fontSize: "12px", color: "#948f85", lineHeight: 1.7, marginTop: "auto" }}>{copy}</div>
+    </Link>
   );
 }
 
-function EmptyStateGlyph() {
-  return (
-    <span style={{
-      width: "34px",
-      height: "34px",
-      borderRadius: "12px",
-      border: "1px dashed #2f2f2f",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      position: "relative",
-    }}>
-      <span style={{ width: "14px", height: "2px", borderRadius: "999px", background: "#2f2f2f", position: "absolute", top: "10px" }} />
-      <span style={{ width: "18px", height: "2px", borderRadius: "999px", background: "#2f2f2f" }} />
-      <span style={{ width: "12px", height: "2px", borderRadius: "999px", background: "#2f2f2f", position: "absolute", bottom: "10px" }} />
-    </span>
-  );
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
+
+function shortCategoryDescription(description: string) {
+  const firstPart = description.split(",")[0];
+  return firstPart.trim();
+}
+
+const eyebrowStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "8px 12px",
+  borderRadius: "999px",
+  background: "rgba(182,245,77,0.08)",
+  border: "1px solid rgba(182,245,77,0.16)",
+  color: "#d2f083",
+  fontSize: "11px",
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  marginBottom: "14px",
+};
+
+const pageTitleStyle: CSSProperties = {
+  fontSize: "clamp(30px, 4.4vw, 44px)",
+  lineHeight: 1.04,
+  letterSpacing: "-0.05em",
+  color: "#f3efe6",
+  margin: "0 0 10px",
+  fontWeight: 800,
+  maxWidth: "14ch",
+};
+
+const pageCopyStyle: CSSProperties = {
+  fontSize: "15px",
+  lineHeight: 1.7,
+  color: "#928c82",
+  margin: 0,
+  maxWidth: "720px",
+};
+
+const cardStyle: CSSProperties = {
+  background: "linear-gradient(180deg, rgba(27,27,25,0.98) 0%, rgba(18,18,17,0.98) 100%)",
+  border: "1px solid rgba(255,255,255,0.07)",
+  borderRadius: "24px",
+  boxShadow: "0 18px 48px rgba(0,0,0,0.22)",
+};
+
+const softCardStyle: CSSProperties = {
+  background: "rgba(255,255,255,0.03)",
+  border: "1px solid rgba(255,255,255,0.07)",
+  borderRadius: "18px",
+};
+
+const primaryLinkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: "42px",
+  padding: "10px 16px",
+  borderRadius: "12px",
+  textDecoration: "none",
+  background: "linear-gradient(135deg, #b6f54d 0%, #d8f97e 100%)",
+  color: "#171813",
+  fontSize: "12px",
+  fontWeight: 800,
+};
+
+const ghostLinkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: "40px",
+  padding: "10px 14px",
+  borderRadius: "12px",
+  textDecoration: "none",
+  background: "rgba(255,255,255,0.03)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  color: "#ece7dc",
+  fontSize: "12px",
+  fontWeight: 700,
+};
