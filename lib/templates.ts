@@ -33,7 +33,7 @@ export const TEMPLATES: Template[] = [
       { key: "productIdea", label: "Your Product Idea / Problem Statement", placeholder: "AI researcher for startups", type: "textarea", maxLength: 150, required: true },
       { key: "profession", label: "Profession", placeholder: "Software Engineer", type: "text", maxLength: 30, required: true },
       { key: "company", label: "Company", placeholder: "BubblebitX", type: "text", maxLength: 30, required: true },
-      { key: "event", label: "Hackathon / Event Name", placeholder: "OpenAI x Outskill AI Builders Hackathon", type: "text", maxLength: 60, required: true },
+      { key: "event", label: "Hackathon / Event Name", placeholder: "AI Builders Hackathon", type: "text", maxLength: 60, required: true },
       { key: "topLine", label: "Event Organizers (bottom logo area)", placeholder: "OpenAI  |  Outskill", type: "text", maxLength: 40, required: false },
     ],
     captionTemplate: `Excited to share that I've been shortlisted for the {{event}} 🚀
@@ -364,10 +364,10 @@ export const BADGE_STYLES = ["professional", "modern", "minimal", "bold"] as con
 export type BadgeStyle = typeof BADGE_STYLES[number];
 
 export const FONT_PAIRS = {
-  classic:    { display: "'Playfair Display', Georgia, serif", body: "'DM Sans', sans-serif",       label: "Classic" },
-  modern:     { display: "'DM Sans', sans-serif",              body: "'DM Sans', sans-serif",       label: "Modern" },
-  startup:    { display: "'Playfair Display', serif",          body: "'DM Sans', sans-serif",       label: "Startup" },
-  corporate:  { display: "'DM Sans', sans-serif",              body: "'DM Sans', sans-serif",       label: "Corporate" },
+  classic:    { display: "Georgia, 'Times New Roman', serif", body: "'Segoe UI', system-ui, sans-serif", label: "Classic" },
+  modern:     { display: "'Segoe UI', system-ui, sans-serif", body: "'Segoe UI', system-ui, sans-serif", label: "Modern" },
+  startup:    { display: "Georgia, serif", body: "'Segoe UI', system-ui, sans-serif", label: "Startup" },
+  corporate:  { display: "'Segoe UI', system-ui, sans-serif", body: "'Segoe UI', system-ui, sans-serif", label: "Corporate" },
 } as const;
 export type FontPair = keyof typeof FONT_PAIRS;
 

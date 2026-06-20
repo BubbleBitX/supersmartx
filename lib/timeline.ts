@@ -1,8 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// EVENT TIMELINE — PRD §12
-// Every generated event saved as a professional journey
-// ─────────────────────────────────────────────────────────────────────────────
-
 export interface TimelineEvent {
   id: string;
   eventTypeId: string;
@@ -10,42 +5,71 @@ export interface TimelineEvent {
   eventTypeIcon: string;
   category: string;
   categoryColor: string;
-  title: string;           // interpolated cardHeadline
+  title: string;
   values: Record<string, string>;
-  platforms: string[];     // which platforms were generated
+  platforms: string[];
   imageDataUrl?: string;
-  captions: Record<string, string>; // platform -> caption
+  captions: Record<string, string>;
   createdAt: string;
 }
 
-const STORAGE_KEY = "g2o_timeline";
-export const TIMELINE_UPDATED_EVENT = "g2o_timeline_updated";
+export const TIMELINE_UPDATED_EVENT = "ssx_timeline_updated";
 
-export function loadTimeline(): TimelineEvent[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+export async function fetchTimeline(): Promise<TimelineEvent[]> {
+  const response = await fetch("/api/timeline", {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    return [];
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to load timeline.");
+  }
+
+  const payload = (await response.json()) as { timeline: TimelineEvent[] };
+  return payload.timeline;
 }
 
-export function saveToTimeline(event: TimelineEvent): void {
-  if (typeof window === "undefined") return;
-  try {
-    const existing = loadTimeline();
-    const updated = [event, ...existing].slice(0, 200);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+export async function saveToTimeline(event: TimelineEvent): Promise<TimelineEvent> {
+  const response = await fetch("/api/timeline", {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(event),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to save timeline event.");
+  }
+
+  const payload = (await response.json()) as { event: TimelineEvent };
+
+  if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(TIMELINE_UPDATED_EVENT));
-  } catch {}
+  }
+
+  return payload.event;
 }
 
-export function deleteFromTimeline(id: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    const updated = loadTimeline().filter(e => e.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+export async function deleteFromTimeline(id: string): Promise<void> {
+  const response = await fetch(`/api/timeline/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete timeline event.");
+  }
+
+  if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(TIMELINE_UPDATED_EVENT));
-  } catch {}
+  }
 }
 
 export function groupByYear(events: TimelineEvent[]): Record<string, TimelineEvent[]> {

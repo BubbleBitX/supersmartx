@@ -1,12 +1,13 @@
-"use client";
+﻿"use client";
 
 import type { CSSProperties } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { bootstrapSupabaseAnon } from "@/lib/supabase/bootstrap";
-import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
-import { loadTimeline, TimelineEvent, TIMELINE_UPDATED_EVENT } from "@/lib/timeline";
+import { fetchProfile, getEmptyProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
+import { fetchTimeline, TimelineEvent, TIMELINE_UPDATED_EVENT } from "@/lib/timeline";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: "grid", label: "Workspace" },
@@ -19,34 +20,40 @@ const NAV_ITEMS = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [profile, setProfile] = useState<UserProfile>(getEmptyProfile);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth < 1100;
-  });
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return window.innerWidth >= 1100;
-  });
+  const [hasMounted, setHasMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
-    const refresh = () => {
-      setProfile(loadProfile());
-      setTimeline(loadTimeline());
+    const refresh = async () => {
+      try {
+        const [nextProfile, nextTimeline] = await Promise.all([fetchProfile(), fetchTimeline()]);
+        setProfile(nextProfile);
+        setTimeline(nextTimeline);
+      } catch (error) {
+        console.error(error);
+      }
     };
 
-    refresh();
-    window.addEventListener(PROFILE_UPDATED_EVENT, refresh);
-    window.addEventListener(TIMELINE_UPDATED_EVENT, refresh);
+    void refresh();
+    const handleRefresh = () => {
+      void refresh();
+    };
+    window.addEventListener(PROFILE_UPDATED_EVENT, handleRefresh);
+    window.addEventListener(TIMELINE_UPDATED_EVENT, handleRefresh);
     return () => {
-      window.removeEventListener(PROFILE_UPDATED_EVENT, refresh);
-      window.removeEventListener(TIMELINE_UPDATED_EVENT, refresh);
+      window.removeEventListener(PROFILE_UPDATED_EVENT, handleRefresh);
+      window.removeEventListener(TIMELINE_UPDATED_EVENT, handleRefresh);
     };
   }, []);
 
   useEffect(() => {
-    void bootstrapSupabaseAnon();
+    // Intentional mount handshake so the first client render matches the server placeholder.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHasMounted(true);
   }, []);
 
   useEffect(() => {
@@ -56,9 +63,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       setSidebarOpen(nextIsMobile ? false : true);
     };
 
+    syncViewport();
     window.addEventListener("resize", syncViewport);
     return () => window.removeEventListener("resize", syncViewport);
   }, []);
+
+  const handleSignOut = async () => {
+    const supabase = getSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    router.push("/sign-in");
+    router.refresh();
+  };
 
   const steps = profileCompletionSteps(profile);
   const completedCount = steps.filter((step) => step.done).length;
@@ -66,6 +81,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const latestEvent = timeline[0] ?? null;
   const recentTimeline = timeline.slice(0, 3);
   const meta = getWorkspaceMeta(pathname, latestEvent);
+
+  if (!hasMounted) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#0a0a09",
+          color: "#f3efe6",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "14px",
+        }}
+      >
+        Loading workspace...
+      </div>
+    );
+  }
 
   return (
     <div
@@ -127,9 +160,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               }}
             >
               {profile.photoUrl ? (
-                <img
+                <Image
                   src={profile.photoUrl}
                   alt=""
+                  width={38}
+                  height={38}
+                  unoptimized
                   style={{
                     width: "38px",
                     height: "38px",
@@ -220,25 +256,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             </div>
 
-            <Link
-              href="/sign-in"
-              onClick={() => {
-                if (isMobile) setSidebarOpen(false);
-              }}
+            <button
+              onClick={() => void handleSignOut()}
               style={{
+                width: "100%",
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: "8px",
                 fontSize: "12px",
-                color: "#666159",
-                textDecoration: "none",
+                color: "#a39d92",
                 padding: "10px 12px",
                 marginTop: "10px",
                 borderRadius: "10px",
+                border: "1px solid rgba(255,255,255,0.06)",
+                background: "transparent",
+                cursor: "pointer",
               }}
             >
-              {"<-"} Sign out
-            </Link>
+              Sign out
+            </button>
           </div>
         </div>
       </aside>
@@ -694,3 +731,5 @@ const softCardStyle: CSSProperties = {
   background: "rgba(255,255,255,0.03)",
   border: "1px solid rgba(255,255,255,0.06)",
 };
+
+

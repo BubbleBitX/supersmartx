@@ -6,12 +6,12 @@ import { getCreateHrefForTemplateId } from "@/lib/routing";
 import { TEMPLATES, TemplateCategory } from "@/lib/templates";
 
 const CATEGORY_META: Record<TemplateCategory, { label: string; color: string; desc: string }> = {
-  achievement: { label: "Achievement", color: "#a3e635", desc: "Hackathons, awards, certifications, and promotions" },
-  career: { label: "Career", color: "#60a5fa", desc: "Promotions, new roles, internships, and open-to-work posts" },
-  founder: { label: "Founder", color: "#fb923c", desc: "Launches, traction, revenue, and startup milestones" },
-  creator: { label: "Creator", color: "#c084fc", desc: "Audience growth, channels, and creator launches" },
-  events: { label: "Events", color: "#2dd4bf", desc: "Talks, webinars, and speaker milestones" },
-  newsletter: { label: "Newsletter", color: "#f87171", desc: "Publishing, subscriber growth, and issue launches" },
+  achievement: { label: "Achievement", color: "#a3e635", desc: "Hackathons, awards, certifications" },
+  career: { label: "Career", color: "#60a5fa", desc: "Promotions, new roles, open to work" },
+  founder: { label: "Founder", color: "#fb923c", desc: "Launches, traction, revenue" },
+  creator: { label: "Creator", color: "#c084fc", desc: "Audience growth, channels" },
+  events: { label: "Events", color: "#2dd4bf", desc: "Talks, webinars, speaker posts" },
+  newsletter: { label: "Newsletter", color: "#f87171", desc: "Publishing and subscriber growth" },
 };
 
 export default function TemplatesPage() {
@@ -42,7 +42,7 @@ export default function TemplatesPage() {
               Template Library
             </h1>
             <p style={{ fontSize: "13px", color: "#555", margin: 0, maxWidth: "620px", lineHeight: 1.6 }}>
-              Fast-start structures for promotions, certifications, open-to-work updates, and other milestone posts.
+              Pick a starting format.
             </p>
           </div>
         </div>
@@ -58,21 +58,6 @@ export default function TemplatesPage() {
         }}>
           Open Create Hub
         </Link>
-      </div>
-
-      <div style={{
-        background: "#111",
-        border: "1px solid #1a1a1a",
-        borderRadius: "12px",
-        padding: "16px 18px",
-        marginBottom: "24px",
-      }}>
-        <div style={{ fontSize: "11px", letterSpacing: "2px", color: "#555", textTransform: "uppercase", marginBottom: "8px" }}>
-          How To Use Templates
-        </div>
-        <div style={{ fontSize: "12px", color: "#666", lineHeight: 1.65 }}>
-          Templates skip category selection and preload the required fields. After that, you still control platforms, styling, preview, and final copy before generating.
-        </div>
       </div>
 
       {categories.map((category) => {
@@ -119,7 +104,7 @@ export default function TemplatesPage() {
                     <div style={{ fontSize: "26px", marginBottom: "8px" }}>{template.icon}</div>
                     <div style={{ fontSize: "12px", fontWeight: 700, color: "#f0f0f0", marginBottom: "6px" }}>{template.name}</div>
                     <div style={{ fontSize: "10px", color: "#555", lineHeight: 1.55 }}>
-                      {template.fields.filter((field) => field.required).length} required fields loaded for you
+                      {template.fields.filter((field) => field.required).length} required fields
                     </div>
                     <div style={{ marginTop: "10px", fontSize: "10px", color: meta.color, fontWeight: 700 }}>
                       Start with template {"->"}

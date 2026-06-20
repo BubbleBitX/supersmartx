@@ -1,69 +1,71 @@
+import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { ensureDatabaseUser, requireAuthenticatedUser, unauthorizedJson } from "@/lib/server/auth";
+import { createCashfreeOrder, getCheckoutPlan, getPlanConfig } from "@/lib/server/cashfree";
+import { paymentsEnabled } from "@/lib/server/feature-flags";
+import { createPaymentOrderForUser, updatePaymentOrderAfterCheckout } from "@/lib/server/payment-repository";
+import { getProfileByUserId } from "@/lib/server/profile-repository";
 
-const PLANS: Record<string, { amount: number; name: string; recurring: boolean }> = {
-  pro:      { amount: 19900, name: "SuperSmartX Pro",      recurring: true  }, // paise
-  lifetime: { amount: 99900, name: "SuperSmartX Lifetime", recurring: false },
-};
-
-export async function GET(req: NextRequest) {
-  const plan = req.nextUrl.searchParams.get("plan") ?? "";
-
-  if (!PLANS[plan]) {
-    return NextResponse.redirect(new URL("/pricing", req.url));
+export async function GET(request: NextRequest) {
+  if (!paymentsEnabled()) {
+    return NextResponse.redirect(new URL("/pricing?error=payments_disabled", request.url));
   }
 
-  const appId    = process.env.CASHFREE_APP_ID;
-  const secretKey = process.env.CASHFREE_SECRET_KEY;
-  const env      = process.env.NEXT_PUBLIC_CASHFREE_ENV ?? "sandbox";
+  try {
+    const user = await requireAuthenticatedUser();
+    await ensureDatabaseUser(user);
 
-  if (!appId || !secretKey) {
-    // Dev mode: redirect back with a message
-    return NextResponse.redirect(
-      new URL(`/pricing?error=cashfree_not_configured`, req.url)
-    );
+    const plan = getCheckoutPlan(request.nextUrl.searchParams.get("plan"));
+    if (!plan) {
+      return NextResponse.redirect(new URL("/pricing?error=invalid_plan", request.url));
+    }
+
+    const planConfig = getPlanConfig(plan);
+    const profile = await getProfileByUserId(user.id);
+    const providerOrderId = `ssx_${plan}_${Date.now()}_${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+
+    await createPaymentOrderForUser({
+      amountPaise: planConfig.amountPaise,
+      billingInterval: planConfig.billingInterval,
+      plan: planConfig.userPlan,
+      productKey: planConfig.productKey,
+      providerOrderId,
+      userId: user.id,
+    });
+
+    const cashfreeOrder = await createCashfreeOrder({
+      amountPaise: planConfig.amountPaise,
+      appBaseUrl,
+      customer: {
+        email: user.email ?? null,
+        id: user.id,
+        name: profile.name,
+      },
+      orderId: providerOrderId,
+      plan,
+    });
+
+    await updatePaymentOrderAfterCheckout({
+      cfOrderId: cashfreeOrder.cfOrderId,
+      paymentSessionId: cashfreeOrder.paymentSessionId,
+      providerOrderId,
+      providerPayload: cashfreeOrder.providerPayload,
+      status: cashfreeOrder.status,
+    });
+
+    const checkoutUrl = new URL("/payment/checkout", request.url);
+    checkoutUrl.searchParams.set("mode", process.env.CASHFREE_ENV === "production" ? "production" : "sandbox");
+    checkoutUrl.searchParams.set("order_id", providerOrderId);
+    checkoutUrl.searchParams.set("payment_session_id", cashfreeOrder.paymentSessionId);
+    checkoutUrl.searchParams.set("plan", plan);
+
+    return NextResponse.redirect(checkoutUrl);
+  } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHORIZED") {
+      return unauthorizedJson();
+    }
+
+    return NextResponse.redirect(new URL("/pricing?error=checkout_failed", request.url));
   }
-
-  const baseUrl = env === "production"
-    ? "https://api.cashfree.com/pg/orders"
-    : "https://sandbox.cashfree.com/pg/orders";
-
-  const orderId = `g2o_${plan}_${Date.now()}`;
-  const appUrl  = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
-  const body = {
-    order_id:       orderId,
-    order_amount:   PLANS[plan].amount / 100,
-    order_currency: "INR",
-    order_note:     PLANS[plan].name,
-    customer_details: {
-      customer_id:    "user_" + Date.now(),
-      customer_email: "user@example.com", // replace with real user email from Clerk
-      customer_phone: "9999999999",
-    },
-    order_meta: {
-      return_url: `${appUrl}/payment/success?order_id={order_id}&plan=${plan}`,
-      notify_url: `${appUrl}/api/payment/webhook`,
-    },
-  };
-
-  const response = await fetch(baseUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "x-api-version": "2023-08-01",
-      "x-client-id":   appId,
-      "x-client-secret": secretKey,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error("Cashfree error:", data);
-    return NextResponse.redirect(new URL(`/pricing?error=payment_failed`, req.url));
-  }
-
-  // Redirect to Cashfree payment page
-  return NextResponse.redirect(data.payment_session_url ?? `/pricing?error=no_session`);
 }

@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
+/* eslint-disable @next/next/no-img-element */
 import { useEffect, useRef, useState } from "react";
 import {
-  getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, saveProfile, UserProfile, profileCompletionSteps
+  fetchProfile, getEmptyProfile, PROFILE_UPDATED_EVENT, saveProfile, uploadProfileAsset, UserProfile, profileCompletionSteps
 } from "@/lib/profile";
 import { THEMES } from "@/lib/templates";
 
@@ -101,10 +102,20 @@ export default function ProfilePage() {
   const logoRef   = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const handler = () => setProfile(loadProfile());
-    handler();
-    window.addEventListener(PROFILE_UPDATED_EVENT, handler);
-    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handler);
+    const handler = async () => {
+      try {
+        setProfile(await fetchProfile());
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    void handler();
+    const handleProfileUpdated = () => {
+      void handler();
+    };
+    window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
   }, []);
 
   const update = (key: keyof UserProfile, value: unknown) =>
@@ -113,16 +124,24 @@ export default function ProfilePage() {
   const updateSocial = (key: string, value: string) =>
     setProfile(p => ({ ...p, social: { ...p.social, [key]: value } }));
 
-  const handleImageUpload = (file: File, key: "photoUrl" | "logoUrl") => {
-    const reader = new FileReader();
-    reader.onload = e => update(key, e.target?.result as string);
-    reader.readAsDataURL(file);
+  const handleImageUpload = async (file: File, key: "photoUrl" | "logoUrl") => {
+    try {
+      const publicUrl = await uploadProfileAsset(file, key === "photoUrl" ? "photo" : "logo");
+      update(key, publicUrl);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
-  const handleSave = () => {
-    saveProfile(profile);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    try {
+      const savedProfile = await saveProfile(profile);
+      setProfile(savedProfile);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const steps = profileCompletionSteps(profile);
@@ -165,10 +184,10 @@ export default function ProfilePage() {
             Profile Setup
           </h1>
           <p style={{ fontSize: "13px", color: "#555", margin: 0 }}>
-            Set this up once. Every promotion, certification, new role, or open-to-work post starts with your saved details already in place.
+            Save once. Reuse everywhere.
           </p>
         </div>
-        <button onClick={handleSave} style={{
+        <button onClick={() => void handleSave()} style={{
           padding: "9px 20px",
           background: saved ? "#1a2e0a" : "linear-gradient(135deg,#a3e635,#84cc16)",
           color: saved ? "#a3e635" : "#000",
@@ -252,7 +271,7 @@ export default function ProfilePage() {
                 }}>+</div>
               </div>
               <input ref={photoRef} type="file" accept="image/*"
-                onChange={e => e.target.files?.[0] && handleImageUpload(e.target.files[0], "photoUrl")}
+                onChange={e => e.target.files?.[0] && void handleImageUpload(e.target.files[0], "photoUrl")}
                 style={{ display: "none" }} />
 
               {/* Logo */}
@@ -278,13 +297,13 @@ export default function ProfilePage() {
                 }}>+</div>
               </div>
               <input ref={logoRef} type="file" accept="image/*"
-                onChange={e => e.target.files?.[0] && handleImageUpload(e.target.files[0], "logoUrl")}
+                onChange={e => e.target.files?.[0] && void handleImageUpload(e.target.files[0], "logoUrl")}
                 style={{ display: "none" }} />
 
               <div style={{ flex: "1 1 220px", minWidth: "220px" }}>
                 <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>Profile Photo *</div>
                 <div style={{ fontSize: "11px", color: "#444", lineHeight: 1.5 }}>
-                  Used on all generated graphics. JPG, PNG, WEBP.
+                  Used on generated graphics.
                 </div>
               </div>
             </div>
@@ -589,7 +608,7 @@ export default function ProfilePage() {
             </div>
           </div>
           <div style={{ marginTop: "12px", fontSize: "11px", color: "#444", lineHeight: 1.6 }}>
-            This preview reflects the details that will auto-fill into every future post you generate.
+            This preview uses your saved profile data.
           </div>
         </div>
 
@@ -624,3 +643,5 @@ function UploadPlaceholder({ variant }: { variant: "photo" | "logo" }) {
     </div>
   );
 }
+
+

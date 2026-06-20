@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 import React from "react";
 import {
   AccentColor,
@@ -24,6 +25,9 @@ export interface AchievementCardProps {
   productIdea: string;
   photoUrl: string | null;
   topLine?: string;
+  eyebrow?: string;
+  headline?: string;
+  footerLabel?: string;
   theme: Theme;
   accentColor: AccentColor;
   profileShape: ProfileShape;
@@ -148,8 +152,8 @@ const BACKGROUND_PRESET_STYLES: Record<
     overlay: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 44%, rgba(0,0,0,0.10) 100%)",
   },
   grain: {
-    base: "radial-gradient(circle at 16% 18%, rgba(255,255,255,0.08) 0%, transparent 20%), radial-gradient(circle at 84% 72%, rgba(255,255,255,0.06) 0%, transparent 18%)",
-    overlay: "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.10) 100%)",
+    base: "radial-gradient(circle at 50% 18%, rgba(255,255,255,0.06) 0%, transparent 18%), radial-gradient(circle at 20% 82%, rgba(255,255,255,0.12) 0%, transparent 22%), radial-gradient(circle at 84% 74%, rgba(255,255,255,0.10) 0%, transparent 18%), linear-gradient(180deg, rgba(255,255,255,0.015) 0%, rgba(0,0,0,0.22) 100%)",
+    overlay: "radial-gradient(ellipse at top, rgba(255,255,255,0.04) 0%, transparent 54%), linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.42) 100%)",
   },
 };
 
@@ -160,6 +164,16 @@ const STAR_POSITIONS = Array.from({ length: 28 }, (_, index) => ({
   o: 0.2 + (index % 5) * 0.08,
 }));
 
+function getInitials(value: string) {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "SS";
+  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() || "").join("");
+}
+
+function splitFooterSegments(value: string) {
+  return value.split("|").map((part) => part.trim()).filter(Boolean);
+}
+
 export default function AchievementCard({
   name,
   profession,
@@ -168,6 +182,9 @@ export default function AchievementCard({
   productIdea,
   photoUrl,
   topLine,
+  eyebrow,
+  headline,
+  footerLabel,
   theme,
   accentColor,
   profileShape,
@@ -195,10 +212,20 @@ export default function AchievementCard({
     profileShape === "rounded" ? "16px" :
     "4px";
 
-  const brandLabel = topLine || "SuperSmartX";
-  const mainQuote = event || productIdea || name;
+  const brandLabel = footerLabel || topLine || "SuperSmartX";
+  const mainQuote = headline || event || productIdea || name;
   const width = fmt.displayW;
   const height = fmt.displayH;
+  const initials = getInitials(name || "Super Smart");
+  const footerSegments = splitFooterSegments(brandLabel);
+  const isPortraitCanvas = height > width;
+  const posterEyebrow = eyebrow || "Career milestone";
+  const posterQuoteSize =
+    height < 340 ? "26px" :
+    isPortraitCanvas ? (mainQuote.length > 52 ? "33px" : "40px") :
+    mainQuote.length > 52 ? "20px" : "24px";
+  const posterCardWidth = isPortraitCanvas ? Math.min(width - 132, 264) : Math.min(width * 0.28, 220);
+  const posterPhotoHeight = isPortraitCanvas ? Math.min(height * 0.39, 320) : Math.min(height * 0.34, 184);
 
   return (
     <div
@@ -280,137 +307,221 @@ export default function AchievementCard({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            padding: height < 250 ? "14px 24px 12px" : "32px 36px 24px",
+            padding: height < 250 ? "18px 20px 14px" : isPortraitCanvas ? "42px 36px 28px" : "22px 32px 22px",
           }}
         >
-          {logoPlacement !== "hidden" && logoPlacement === "top" && (
-            <div
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                letterSpacing: "1px",
-                color: tc.textPrimary,
-                marginBottom: height < 250 ? "6px" : "10px",
-                opacity: 0.9,
-              }}
-            >
-              {brandLabel}
-            </div>
-          )}
+          <div
+            style={{
+              position: "absolute",
+              inset: "auto -10% -6% -10%",
+              height: isPortraitCanvas ? "38%" : "48%",
+              background: "radial-gradient(ellipse at 20% 55%, rgba(255,255,255,0.15) 0%, transparent 34%), radial-gradient(ellipse at 80% 48%, rgba(255,255,255,0.13) 0%, transparent 32%), radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.15) 0%, transparent 58%)",
+              filter: "blur(14px)",
+              opacity: 0.72,
+              pointerEvents: "none",
+            }}
+          />
 
-          {height >= 250 && (
-            <div
-              style={{
-                ...badge,
-                background: accent.bg,
-                border: `1px solid ${accent.primary}40`,
-                color: accent.primary,
-                textTransform: "uppercase",
-                marginBottom: "12px",
-              }}
-            >
-              {topLine ? topLine.toUpperCase() : "ACHIEVEMENT"}
-            </div>
-          )}
+          <div
+            style={{
+              position: "absolute",
+              inset: "0 auto auto auto",
+              top: isPortraitCanvas ? "8%" : "12%",
+              width: isPortraitCanvas ? "72%" : "42%",
+              height: isPortraitCanvas ? "14%" : "24%",
+              background: `radial-gradient(circle, ${accent.primary}14 0%, transparent 72%)`,
+              filter: "blur(18px)",
+              pointerEvents: "none",
+            }}
+          />
+
+          <div
+            style={{
+              fontSize: height < 250 ? "9px" : "11px",
+              fontWeight: 700,
+              letterSpacing: "2.8px",
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.42)",
+              textAlign: "center",
+              maxWidth: isPortraitCanvas ? `${width - 96}px` : `${width - 120}px`,
+              lineHeight: 1.35,
+            }}
+          >
+            {posterEyebrow}
+          </div>
 
           <div
             style={{
               fontFamily: fonts.display,
-              fontStyle: fontPair === "classic" || fontPair === "startup" ? "italic" : "normal",
+              fontStyle: "italic",
               fontWeight: 700,
-              fontSize: height < 250 ? "14px" : mainQuote.length > 40 ? "17px" : "20px",
+              fontSize: posterQuoteSize,
               color: accent.primary,
               textAlign: "center",
-              lineHeight: 1.3,
-              marginBottom: height < 250 ? "8px" : "18px",
-              maxWidth: `${width - 60}px`,
+              lineHeight: 1.18,
+              marginTop: height < 250 ? "12px" : isPortraitCanvas ? "24px" : "14px",
+              maxWidth: isPortraitCanvas ? `${width - 96}px` : `${width - 140}px`,
+              textShadow: `0 0 28px ${accent.primary}22`,
             }}
           >
             &quot;{mainQuote}&quot;
           </div>
 
+          <div style={{ flex: 1 }} />
+
           {height >= 250 && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+            <div
+              style={{
+                width: `${posterCardWidth}px`,
+                maxWidth: "calc(100% - 72px)",
+                borderRadius: "26px",
+                overflow: "hidden",
+                background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 18%, rgba(0,0,0,0.52) 100%)",
+                border: `1px solid ${tc.isDark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.08)"}`,
+                boxShadow: "0 34px 90px rgba(0,0,0,0.48)",
+                backdropFilter: "blur(16px)",
+                position: "relative",
+              }}
+            >
               <div
                 style={{
-                  width: "132px",
-                  height: "164px",
-                  borderRadius: profileRadius,
+                  position: "absolute",
+                  inset: "0 0 auto 0",
+                  height: "1px",
+                  background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.42) 50%, transparent 100%)",
+                }}
+              />
+              <div
+                style={{
+                  margin: "14px",
+                  height: `${posterPhotoHeight}px`,
+                  borderRadius: profileShape === "circle" ? "30px" : "20px",
                   overflow: "hidden",
-                  background: tc.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+                  background: "linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(22,22,26,0.96) 100%)",
                   border: `1px solid ${tc.cardBorder}`,
-                  boxShadow: `0 22px 50px ${tc.isDark ? "rgba(0,0,0,0.34)" : "rgba(0,0,0,0.12)"}`,
                   position: "relative",
+                }}
+              >
+                {photoUrl ? (
+                  <img src={photoUrl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: isPortraitCanvas ? "54px" : "34px",
+                      fontWeight: 700,
+                      color: accent.primary,
+                      background: "radial-gradient(circle at 50% 22%, rgba(255,255,255,0.12) 0%, rgba(18,18,22,0.95) 70%)",
+                    }}
+                  >
+                    {initials}
+                  </div>
+                )}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "4px",
+                  padding: isPortraitCanvas ? "0 18px 18px" : "0 16px 16px",
                 }}
               >
                 <div
                   style={{
-                    position: "absolute",
-                    inset: "10px 10px auto auto",
-                    width: "28px",
-                    height: "28px",
-                    borderRadius: "50%",
-                    background: `${accent.primary}18`,
-                    border: `1px solid ${accent.primary}42`,
-                    backdropFilter: "blur(8px)",
-                    zIndex: 1,
+                    fontFamily: fonts.display,
+                    fontSize: isPortraitCanvas ? "26px" : "18px",
+                    fontWeight: 700,
+                    color: tc.textPrimary,
+                    textAlign: "center",
+                    lineHeight: 1.05,
                   }}
-                />
-                {photoUrl ? (
-                  <img src={photoUrl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: "36px" }}>
-                    {"\u{1F464}"}
-                  </div>
-                )}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: tc.textPrimary, textAlign: "center" }}>
+                >
                   {name || "Your Name"}
                 </div>
-                <div style={{ fontSize: "11px", color: tc.textSecondary, textAlign: "center", letterSpacing: "0.03em" }}>
-                  {profession}
-                </div>
-                {company && <div style={{ fontSize: "11px", color: tc.textSecondary, textAlign: "center" }}>{company}</div>}
+                {profession && (
+                  <div
+                    style={{
+                      fontSize: isPortraitCanvas ? "13px" : "11px",
+                      color: "rgba(255,255,255,0.82)",
+                      textAlign: "center",
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    {profession}
+                  </div>
+                )}
+                {company && (
+                  <div
+                    style={{
+                      fontSize: isPortraitCanvas ? "16px" : "12px",
+                      fontWeight: 700,
+                      color: tc.textPrimary,
+                      textAlign: "center",
+                    }}
+                  >
+                    {company}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           <div style={{ flex: 1 }} />
 
-          {ctaText && height >= 250 && (
+          {ctaText && ctaStyle !== "none" && height >= 250 && (
             <div
               style={{
                 fontSize: "10px",
                 fontWeight: 600,
-                letterSpacing: "0.5px",
+                letterSpacing: "0.9px",
                 color: accent.primary,
-                border: `1px solid ${accent.primary}50`,
-                borderRadius: "20px",
-                padding: "4px 12px",
-                marginBottom: "10px",
+                textTransform: "uppercase",
+                marginBottom: "12px",
+                opacity: 0.86,
               }}
             >
               {ctaText}
             </div>
           )}
 
-          {logoPlacement === "bottom" && (
+          {logoPlacement !== "hidden" && (
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderTop: `1px solid ${tc.isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-                paddingTop: height < 250 ? "8px" : "14px",
-                width: "100%",
-                fontSize: height < 250 ? "12px" : "15px",
-                fontWeight: 700,
+                gap: isPortraitCanvas ? "14px" : "12px",
+                paddingTop: height < 250 ? "8px" : "10px",
                 color: tc.textPrimary,
-                letterSpacing: "-0.3px",
+                flexWrap: "wrap",
               }}
             >
-              {brandLabel}
+              {footerSegments.map((segment, index) => (
+                <React.Fragment key={`${segment}-${index}`}>
+                  <div
+                    style={{
+                      fontSize: isPortraitCanvas ? "18px" : "13px",
+                      fontWeight: 700,
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    {segment}
+                  </div>
+                  {index < footerSegments.length - 1 && (
+                    <div
+                      style={{
+                        width: "1px",
+                        height: isPortraitCanvas ? "28px" : "18px",
+                        background: "rgba(255,255,255,0.42)",
+                      }}
+                    />
+                  )}
+                </React.Fragment>
+              ))}
             </div>
           )}
         </div>
@@ -444,8 +555,8 @@ export default function AchievementCard({
               {photoUrl ? (
                 <img src={photoUrl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: "30px" }}>
-                  {"\u{1F464}"}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: "30px", fontWeight: 700, color: accent.primary }}>
+                  {initials}
                 </div>
               )}
             </div>
@@ -553,6 +664,25 @@ export default function AchievementCard({
               }}
             >
               <img src={photoUrl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+          )}
+          {!photoUrl && height >= 250 && (
+            <div
+              style={{
+                width: "90px",
+                height: "90px",
+                borderRadius: profileRadius,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: `2px solid ${accent.primary}`,
+                color: accent.primary,
+                fontSize: "28px",
+                fontWeight: 700,
+                background: "rgba(255,255,255,0.04)",
+              }}
+            >
+              {initials}
             </div>
           )}
           <div

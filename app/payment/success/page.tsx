@@ -1,14 +1,17 @@
 import Link from "next/link";
-import { Metadata } from "next";
+import type { Metadata } from "next";
+import PaymentSuccessStatus from "@/components/payment/PaymentSuccessStatus";
 
-export const metadata: Metadata = { title: "Payment Successful — SuperSmartX" };
+export const metadata: Metadata = { title: "Payment Successful - SuperSmartX" };
 
-export default function PaymentSuccessPage({
+export default async function PaymentSuccessPage({
   searchParams,
 }: {
-  searchParams: { plan?: string; order_id?: string };
+  searchParams: Promise<{ plan?: string; order_id?: string }>;
 }) {
-  const plan = searchParams.plan ?? "pro";
+  const params = await searchParams;
+  const plan = params.plan ?? "pro";
+  const orderId = params.order_id;
 
   return (
     <div style={{
@@ -21,27 +24,28 @@ export default function PaymentSuccessPage({
         borderRadius: "20px", padding: "48px 40px",
         textAlign: "center", maxWidth: "440px", width: "100%",
       }}>
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>🎉</div>
+        <div style={{ fontSize: "48px", marginBottom: "16px" }}>Success</div>
         <h1 style={{ fontSize: "26px", fontWeight: 800, color: "#f5f5f5", margin: "0 0 8px", letterSpacing: "-0.5px" }}>
-          Payment Successful!
+          Payment successful
         </h1>
         <p style={{ fontSize: "14px", color: "#666", margin: "0 0 8px" }}>
-          You now have <strong style={{ color: "#a3e635" }}>
-            {plan === "lifetime" ? "Lifetime" : "Pro"}
-          </strong> access to SuperSmartX.
+          {plan === "lifetime"
+            ? <>You now have <strong style={{ color: "#a3e635" }}>Lifetime</strong> access to SuperSmartX.</>
+            : <>You now have <strong style={{ color: "#a3e635" }}>Pro 30-day</strong> access to SuperSmartX.</>}
         </p>
-        {searchParams.order_id && (
-          <p style={{ fontSize: "11px", color: "#444", margin: "0 0 28px" }}>
-            Order ID: {searchParams.order_id}
+        {orderId && (
+          <p style={{ fontSize: "11px", color: "#444", margin: "0 0 20px" }}>
+            Order ID: {orderId}
           </p>
         )}
+        {orderId ? <PaymentSuccessStatus orderId={orderId} /> : null}
         <Link href="/create" style={{
           display: "block", padding: "13px",
           background: "linear-gradient(135deg, #a3e635, #84cc16)",
           color: "#000", fontSize: "14px", fontWeight: 700,
           borderRadius: "10px", textDecoration: "none",
         }}>
-          Start Creating →
+          Start creating
         </Link>
       </div>
     </div>

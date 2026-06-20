@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserPlan {
+  free
+  pro
+  lifetime
+}
+
+enum PaymentProvider {
+  cashfree
+}
+
+enum PaymentStatus {
+  created
+  pending
+  paid
+  failed
+  cancelled
+}
+
+enum BillingInterval {
+  none
+  days30
+  lifetime
+}
+
+enum AccessGrantStatus {
+  active
+  expired
+  revoked
+}
+
+enum UsageEventKind {
+  export_download
+}
+
+enum WebhookProcessingStatus {
+  received
+  processed
+  ignored
+  failed
+}
+
+model User {
+  id                 String        @id @db.Uuid
+  email              String?       @unique
+  plan               UserPlan      @default(free)
+  planExpiresAt      DateTime?     @map("plan_expires_at")
+  downloadsThisMonth Int           @default(0) @map("downloads_this_month")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  accessGrants       AccessGrant[]
+  paymentOrders      PaymentOrder[]
+  profile            Profile?
+  savedGenerations   SavedGeneration[]
+  usageEvents        UsageEvent[]
+  webhookEvents      WebhookEvent[]
+
+  @@map("users")
+}
+
+model Profile {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique @db.Uuid @map("user_id")
+  name          String   @default("")
+  headline      String   @default("")
+  role          String   @default("")
+  company       String   @default("")
+  bio           String   @default("")
+  website       String   @default("")
+  photoUrl      String?  @map("photo_url")
+  logoUrl       String?  @map("logo_url")
+  brandColor    String   @default("#a3e635") @map("brand_color")
+  brandTheme    String   @default("dark") @map("brand_theme")
+  social        Json     @default("{}")
+  setupComplete Boolean  @default(false) @map("setup_complete")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model SavedGeneration {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid @map("user_id")
+  eventTypeId    String   @map("event_type_id")
+  eventTypeLabel String   @map("event_type_label")
+  eventTypeIcon  String   @map("event_type_icon")
+  category       String
+  categoryColor  String   @map("category_color")
+  title          String
+  values         Json
+  platforms      Json
+  captions       Json
+  imageDataUrl   String?  @map("image_data_url")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("saved_generations")
+}
+
+model PaymentOrder {
+  id               String          @id @default(uuid()) @db.Uuid
+  userId           String          @db.Uuid @map("user_id")
+  provider         PaymentProvider @default(cashfree)
+  productKey       String          @map("product_key")
+  plan             UserPlan
+  billingInterval  BillingInterval @default(none) @map("billing_interval")
+  providerOrderId  String          @unique @map("provider_order_id")
+  cfOrderId        String?         @unique @map("cf_order_id")
+  paymentSessionId String?         @map("payment_session_id")
+  amountPaise      Int             @map("amount_paise")
+  currency         String          @default("INR")
+  status           PaymentStatus   @default(created)
+  providerPayload  Json            @default("{}") @map("provider_payload")
+  accessStartsAt   DateTime?       @map("access_starts_at")
+  accessEndsAt     DateTime?       @map("access_ends_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  paidAt           DateTime?       @map("paid_at")
+  accessGrant      AccessGrant?
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("payment_orders")
+}
+
+model AccessGrant {
+  id              String            @id @default(uuid()) @db.Uuid
+  userId          String            @db.Uuid @map("user_id")
+  orderId         String            @unique @db.Uuid @map("order_id")
+  provider        PaymentProvider   @default(cashfree)
+  productKey      String            @map("product_key")
+  plan            UserPlan
+  billingInterval BillingInterval   @map("billing_interval")
+  status          AccessGrantStatus @default(active)
+  startsAt        DateTime          @map("starts_at")
+  endsAt          DateTime?         @map("ends_at")
+  metadata        Json              @default("{}")
+  grantedAt       DateTime          @default(now()) @map("granted_at")
+  revokedAt       DateTime?         @map("revoked_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  order           PaymentOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, endsAt(sort: Desc)])
+  @@map("access_grants")
+}
+
+model UsageEvent {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @db.Uuid @map("user_id")
+  kind      UsageEventKind
+  periodKey String         @map("period_key")
+  metadata  Json           @default("{}")
+  createdAt DateTime       @default(now()) @map("created_at")
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, periodKey, createdAt(sort: Desc)])
+  @@map("usage_events")
+}
+
+model WebhookEvent {
+  id               String                  @id @default(uuid()) @db.Uuid
+  userId           String?                 @db.Uuid @map("user_id")
+  provider         PaymentProvider         @default(cashfree)
+  providerEventId  String?                 @unique @map("provider_event_id")
+  eventHash        String                  @unique @map("event_hash")
+  providerOrderId  String?                 @map("provider_order_id")
+  paymentStatus    String?                 @map("payment_status")
+  processingStatus WebhookProcessingStatus @default(received) @map("processing_status")
+  payload          Json
+  errorMessage     String?                 @map("error_message")
+  receivedAt       DateTime                @default(now()) @map("received_at")
+  processedAt      DateTime?               @map("processed_at")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+  user             User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([providerOrderId, receivedAt(sort: Desc)])
+  @@map("webhook_events")
+}

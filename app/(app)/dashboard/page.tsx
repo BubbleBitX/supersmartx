@@ -1,28 +1,36 @@
-"use client";
+﻿"use client";
 
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { EVENT_CATEGORIES } from "@/lib/events/categories";
-import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, UserProfile } from "@/lib/profile";
-import { loadTimeline, TimelineEvent, TIMELINE_UPDATED_EVENT } from "@/lib/timeline";
+import { fetchProfile, getEmptyProfile, PROFILE_UPDATED_EVENT, UserProfile } from "@/lib/profile";
+import { fetchTimeline, TimelineEvent, TIMELINE_UPDATED_EVENT } from "@/lib/timeline";
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<UserProfile>(getEmptyProfile);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
 
   useEffect(() => {
-    const refresh = () => {
-      setProfile(loadProfile());
-      setTimeline(loadTimeline());
+    const refresh = async () => {
+      try {
+        const [nextProfile, nextTimeline] = await Promise.all([fetchProfile(), fetchTimeline()]);
+        setProfile(nextProfile);
+        setTimeline(nextTimeline);
+      } catch (error) {
+        console.error(error);
+      }
     };
 
-    refresh();
-    window.addEventListener(PROFILE_UPDATED_EVENT, refresh);
-    window.addEventListener(TIMELINE_UPDATED_EVENT, refresh);
+    void refresh();
+    const handleRefresh = () => {
+      void refresh();
+    };
+    window.addEventListener(PROFILE_UPDATED_EVENT, handleRefresh);
+    window.addEventListener(TIMELINE_UPDATED_EVENT, handleRefresh);
     return () => {
-      window.removeEventListener(PROFILE_UPDATED_EVENT, refresh);
-      window.removeEventListener(TIMELINE_UPDATED_EVENT, refresh);
+      window.removeEventListener(PROFILE_UPDATED_EVENT, handleRefresh);
+      window.removeEventListener(TIMELINE_UPDATED_EVENT, handleRefresh);
     };
   }, []);
 
@@ -77,11 +85,7 @@ export default function DashboardPage() {
             href={latestEvent ? `/create?reuse=${encodeURIComponent(latestEvent.id)}` : "/profile"}
             title={latestEvent ? "Reuse latest workspace" : "Finish profile setup"}
             label={latestEvent ? "Reuse" : "Setup"}
-            copy={
-              latestEvent
-                ? `${latestEvent.eventTypeLabel} is already saved.`
-                : "Save your core details once."
-            }
+            copy={latestEvent ? `${latestEvent.eventTypeLabel} is already saved.` : "Save your core details once."}
             accent="rgba(241,199,109,0.10)"
             border="rgba(241,199,109,0.18)"
           />
@@ -138,7 +142,7 @@ export default function DashboardPage() {
                     <span style={{ fontSize: "13px", fontWeight: 700, color: "#f3efe6", lineHeight: 1.35 }}>{event.title}</span>
                   </div>
                   <div style={{ fontSize: "11px", color: "#89847a" }}>
-                    {event.platforms.join(" / ")} · {formatDate(event.createdAt)}
+                    {event.platforms.join(" / ")} - {formatDate(event.createdAt)}
                   </div>
                 </Link>
               ))}
@@ -197,21 +201,7 @@ export default function DashboardPage() {
   );
 }
 
-function ActionCard({
-  href,
-  title,
-  label,
-  copy,
-  accent,
-  border,
-}: {
-  href: string;
-  title: string;
-  label: string;
-  copy: string;
-  accent: string;
-  border: string;
-}) {
+function ActionCard({ href, title, label, copy, accent, border }: { href: string; title: string; label: string; copy: string; accent: string; border: string }) {
   return (
     <Link
       href={href}
@@ -227,9 +217,7 @@ function ActionCard({
         minHeight: "176px",
       }}
     >
-      <div style={{ fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#857f75", marginBottom: "10px" }}>
-        {label}
-      </div>
+      <div style={{ fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#857f75", marginBottom: "10px" }}>{label}</div>
       <div style={{ fontSize: "18px", fontWeight: 700, color: "#f3efe6", marginBottom: "8px", lineHeight: 1.2 }}>{title}</div>
       <div style={{ fontSize: "12px", color: "#948f85", lineHeight: 1.7, marginTop: "auto" }}>{copy}</div>
     </Link>
@@ -323,3 +311,4 @@ const ghostLinkStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
 };
+

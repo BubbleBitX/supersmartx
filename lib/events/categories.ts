@@ -81,7 +81,7 @@ export const EVENT_TYPES: EventType[] = [
     baseSummary: "{{name}} has been selected for {{achievement}}",
     fields: [
       nameField(),
-      achievementField("Hackathon / Event Name", "OpenAI x Outskill AI Builders Hackathon"),
+      achievementField("Hackathon / Event Name", "AI Builders Hackathon"),
       { key: "product_idea", label: "What you're building", placeholder: "AI researcher for startups", type: "textarea", maxLength: 150, required: true },
       roleField("Software Engineer"),
       companyField("BubblebitX"),

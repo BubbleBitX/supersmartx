@@ -1,72 +1,79 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import { paymentsEnabled, paymentsProductionReady } from "@/lib/server/feature-flags";
 
 export const metadata: Metadata = {
   title: "Pricing - SuperSmartX",
-  description: "Free plan available. Pro at Rs 199/month. Lifetime access at Rs 999.",
+  description: "Free plan available. Pro 30-day access at Rs 199. Lifetime access at Rs 999.",
 };
 
-const PLANS = [
-  {
-    name: "Free",
-    price: "Rs 0",
-    period: "forever",
-    description: "For your next career milestone post",
-    color: "#555",
-    features: [
-      { text: "5 downloads / month", included: true },
-      { text: "Saved profile autofill", included: true },
-      { text: "LinkedIn + multi-platform captions", included: true },
-      { text: "3 themes", included: true },
-      { text: "Watermarked exports", included: true },
-      { text: "All 6 themes", included: false },
-      { text: "No watermark", included: false },
-    ],
-    cta: "Get Started Free",
-    ctaHref: "/create",
-    highlight: false,
-  },
-  {
-    name: "Pro",
-    price: "Rs 199",
-    period: "per month",
-    description: "For professionals who share milestones regularly",
-    color: "#a3e635",
-    features: [
-      { text: "Unlimited downloads", included: true },
-      { text: "Profile once, post forever workflow", included: true },
-      { text: "Platform-aware captions for 12 platforms", included: true },
-      { text: "All 6 themes", included: true },
-      { text: "No watermark", included: true },
-      { text: "All output formats", included: true },
-      { text: "Priority support", included: true },
-    ],
-    cta: "Start Pro",
-    ctaHref: "/api/checkout?plan=pro",
-    highlight: true,
-  },
-  {
-    name: "Lifetime",
-    price: "Rs 999",
-    period: "one time",
-    description: "Own your milestone posting workflow forever",
-    color: "#c084fc",
-    features: [
-      { text: "Unlimited downloads", included: true },
-      { text: "Profile once, post forever workflow", included: true },
-      { text: "Platform-aware captions for 12 platforms", included: true },
-      { text: "All 6 themes", included: true },
-      { text: "No watermark", included: true },
-      { text: "All output formats", included: true },
-      { text: "All future templates", included: true },
-    ],
-    cta: "Get Lifetime Access",
-    ctaHref: "/api/checkout?plan=lifetime",
-    highlight: false,
-  },
-];
-
 export default function PricingPage() {
+  const isPaymentsEnabled = paymentsEnabled();
+  const isPaymentsProductionReady = paymentsProductionReady();
+  const plans = [
+    {
+      name: "Free",
+      price: "Rs 0",
+      period: "forever",
+      description: "For occasional posts",
+      color: "#555",
+      features: [
+        { text: "5 downloads / month", included: true },
+        { text: "Saved profile autofill", included: true },
+        { text: "LinkedIn + multi-platform captions", included: true },
+        { text: "3 themes", included: true },
+        { text: "Watermarked exports", included: true },
+        { text: "No watermark", included: false },
+        { text: "Pro access window", included: false },
+      ],
+      cta: "Get Started Free",
+      ctaHref: "/create",
+      highlight: false,
+    },
+    {
+      name: "Pro",
+      price: "Rs 199",
+      period: "30 days",
+      description: isPaymentsEnabled ? "Unlimited exports for one access window" : "Upgrade path opens after billing relaunch",
+      color: "#a3e635",
+      features: [
+        { text: "Unlimited downloads during access window", included: true },
+        { text: "Profile once, post forever workflow", included: true },
+        { text: "Platform-aware captions for 12 platforms", included: true },
+        { text: "All 6 themes", included: true },
+        { text: "No watermark", included: true },
+        { text: "Webhook-confirmed access activation", included: true },
+        { text: "Priority support", included: true },
+      ],
+      cta: isPaymentsEnabled ? "Get Pro 30 Days" : "Contact for Pro",
+      ctaHref: isPaymentsEnabled
+        ? "/api/checkout?plan=pro"
+        : "mailto:hello@gozero2one.com?subject=SuperSmartX%20Pro",
+      highlight: true,
+    },
+    {
+      name: "Lifetime",
+      price: "Rs 999",
+      period: "one time",
+      description: isPaymentsEnabled ? "Permanent access" : "Available after secure checkout rebuild",
+      color: "#c084fc",
+      features: [
+        { text: "Unlimited downloads", included: true },
+        { text: "Profile once, post forever workflow", included: true },
+        { text: "Platform-aware captions for 12 platforms", included: true },
+        { text: "All 6 themes", included: true },
+        { text: "No watermark", included: true },
+        { text: "All future templates in this app", included: true },
+        { text: "Lifetime access record", included: true },
+      ],
+      cta: isPaymentsEnabled ? "Get Lifetime Access" : "Contact for Lifetime",
+      ctaHref: isPaymentsEnabled
+        ? "/api/checkout?plan=lifetime"
+        : "mailto:hello@gozero2one.com?subject=SuperSmartX%20Lifetime",
+      highlight: false,
+    },
+  ];
+
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", padding: "40px 24px" }}>
       <div style={{ maxWidth: "860px", margin: "0 auto 48px", textAlign: "center" }}>
@@ -91,12 +98,33 @@ export default function PricingPage() {
             letterSpacing: "-1px",
           }}
         >
-          Pricing for people who post career wins often
+          Simple pricing
         </h1>
         <p style={{ fontSize: "16px", color: "#555", margin: 0 }}>
-          Start free, then upgrade for unlimited exports, more themes, and watermark-free posts.
+          {isPaymentsEnabled
+            ? "Start free. Upgrade securely whenever you need more exports or a clean watermark-free finish."
+            : "Start free. Upgrade path stays manual until secure billing is enabled."}
         </p>
       </div>
+
+      {!isPaymentsEnabled && (
+        <div
+          style={{
+            maxWidth: "860px",
+            margin: "0 auto 20px",
+            padding: "14px 16px",
+            borderRadius: "14px",
+            background: "#111",
+            border: "1px solid #1f1f1f",
+            color: "#8f8f8f",
+            fontSize: "13px",
+          }}
+        >
+          {isPaymentsProductionReady
+            ? "Online checkout is disabled because ENABLE_PAYMENTS is still off."
+            : "Online checkout is disabled until a public HTTPS app URL and Cashfree credentials are configured."}
+        </div>
+      )}
 
       <div
         style={{
@@ -107,7 +135,7 @@ export default function PricingPage() {
           gap: "16px",
         }}
       >
-        {PLANS.map((plan) => (
+        {plans.map((plan) => (
           <div
             key={plan.name}
             style={{
@@ -115,100 +143,102 @@ export default function PricingPage() {
               border: `1px solid ${plan.highlight ? `${plan.color}40` : "#1e1e1e"}`,
               borderRadius: "16px",
               padding: "28px 24px",
-              display: "flex",
-              flexDirection: "column",
-              position: "relative",
               boxShadow: plan.highlight ? `0 0 40px ${plan.color}15` : "none",
             }}
           >
             {plan.highlight && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-12px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  background: plan.color,
-                  color: "#000",
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  letterSpacing: "1px",
-                  padding: "4px 14px",
-                  borderRadius: "20px",
-                }}
-              >
-                MOST POPULAR
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                background: plan.color,
+                color: "#000",
+                fontSize: "11px",
+                fontWeight: 800,
+                textTransform: "uppercase",
+                borderRadius: "999px",
+                padding: "6px 10px",
+                marginBottom: "14px",
+              }}>
+                Recommended
               </div>
             )}
-
-            <div style={{ marginBottom: "20px" }}>
-              <div
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  color: plan.color,
-                  marginBottom: "8px",
-                  letterSpacing: "0.3px",
-                }}
-              >
-                {plan.name}
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                <span style={{ fontSize: "36px", fontWeight: 800, color: "#f5f5f5", letterSpacing: "-1px" }}>
-                  {plan.price}
-                </span>
-                <span style={{ fontSize: "13px", color: "#555" }}>{plan.period}</span>
-              </div>
-              <div style={{ fontSize: "12px", color: "#555", marginTop: "6px" }}>{plan.description}</div>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: plan.color, marginBottom: "8px" }}>
+              {plan.name}
             </div>
+            <div style={{ fontSize: "32px", fontWeight: 800, color: "#f5f5f5", letterSpacing: "-1px" }}>
+              {plan.price}
+            </div>
+            <span style={{ fontSize: "13px", color: "#555" }}>{plan.period}</span>
+            <div style={{ fontSize: "12px", color: "#555", marginTop: "6px" }}>{plan.description}</div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "24px", flex: 1 }}>
+            <div style={{ marginTop: "22px", display: "grid", gap: "10px" }}>
               {plan.features.map((feature, index) => (
-                <div key={index} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span
+                <div key={`${plan.name}-${index}`} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                  <div
                     style={{
-                      fontSize: "12px",
+                      marginTop: "2px",
                       color: feature.included ? plan.color : "#333",
-                      flexShrink: 0,
+                      fontSize: "12px",
+                      fontWeight: 800,
                     }}
                   >
                     {feature.included ? "+" : "-"}
-                  </span>
-                  <span style={{ fontSize: "12px", color: feature.included ? "#ccc" : "#444" }}>
+                  </div>
+                  <div style={{ fontSize: "12px", color: feature.included ? "#cfcfcf" : "#5a5a5a", lineHeight: 1.5 }}>
                     {feature.text}
-                  </span>
+                  </div>
                 </div>
               ))}
             </div>
 
-            <Link
-              href={plan.ctaHref}
-              style={{
-                display: "block",
-                textAlign: "center",
-                padding: "12px",
-                background: plan.highlight ? plan.color : "#1a1a1a",
-                color: plan.highlight ? "#000" : "#ccc",
-                fontSize: "13px",
-                fontWeight: 700,
-                borderRadius: "8px",
-                textDecoration: "none",
-                border: `1px solid ${plan.highlight ? plan.color : "#2a2a2a"}`,
-                transition: "opacity 0.2s",
-              }}
-            >
-              {plan.cta}
-            </Link>
+            {plan.ctaHref.startsWith("/") ? (
+              <Link
+                href={plan.ctaHref}
+                style={{
+                  display: "block",
+                  textAlign: "center",
+                  marginTop: "24px",
+                  padding: "12px 14px",
+                  background: plan.highlight ? plan.color : "#1a1a1a",
+                  color: plan.highlight ? "#000" : "#ccc",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  border: `1px solid ${plan.highlight ? plan.color : "#2a2a2a"}`,
+                  borderRadius: "10px",
+                }}
+              >
+                {plan.cta}
+              </Link>
+            ) : (
+              <a
+                href={plan.ctaHref}
+                style={{
+                  display: "block",
+                  textAlign: "center",
+                  marginTop: "24px",
+                  padding: "12px 14px",
+                  background: plan.highlight ? plan.color : "#1a1a1a",
+                  color: plan.highlight ? "#000" : "#ccc",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  border: `1px solid ${plan.highlight ? plan.color : "#2a2a2a"}`,
+                  borderRadius: "10px",
+                }}
+              >
+                {plan.cta}
+              </a>
+            )}
           </div>
         ))}
       </div>
 
-      <div style={{ maxWidth: "600px", margin: "56px auto 0", textAlign: "center" }}>
-        <div style={{ fontSize: "12px", color: "#444", lineHeight: 1.8 }}>
-          Payments powered by Cashfree | Secure checkout | Cancel anytime (Pro)
-          <br />
-          Questions? Reach out at <span style={{ color: "#666" }}>hello@gozero2one.com</span>
-        </div>
+      <div style={{ maxWidth: "860px", margin: "24px auto 0", fontSize: "12px", color: "#666", textAlign: "center" }}>
+        {isPaymentsEnabled
+          ? "Secure checkout powered by Cashfree. Pro grants a 30-day access window with server-tracked usage and webhook-confirmed activation."
+          : "Secure checkout stays disabled until env + webhook setup is complete."}
       </div>
     </div>
   );

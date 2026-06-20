@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -26,7 +26,6 @@ import { generatePlatformCaption, PlatformContent } from "@/lib/platforms/captio
 import {
   ACCENT_COLORS,
   BACKGROUND_PRESETS,
-  THEMES,
   TEMPLATES,
   LAYOUTS,
   PROFILE_SHAPES,
@@ -46,9 +45,10 @@ import {
   DownloadFormat,
   BackgroundPreset,
 } from "@/lib/templates";
-import { getEmptyProfile, loadProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
+import { fetchProfile, getEmptyProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
+import { fetchEntitlements, getDefaultEntitlements, type AppEntitlements } from "@/lib/entitlements";
 import { getCreateHrefForTemplateId, getEventTypeIdForTemplateId } from "@/lib/routing";
-import { loadTimeline, saveToTimeline } from "@/lib/timeline";
+import { fetchTimeline, saveToTimeline, TIMELINE_UPDATED_EVENT, TimelineEvent } from "@/lib/timeline";
 import AchievementCard from "@/components/AchievementCard";
 
 type Step = "entry" | "category" | "event" | "platforms" | "form" | "style" | "output";
@@ -116,6 +116,7 @@ export default function CreateFlow() {
   const initialCategory = initialEvent?.category || (searchParams.get("category") as EventCategorySlug) || null;
   const cameFromTemplate = !!selectedTemplateId;
   const hasDirectCreateIntent = !!selectedTemplateId || !!requestedEventTypeId || !!initialCategory;
+  const startsInHackathonMode = initialEvent?.id === "hackathon-selected";
 
   const [step, setStep] = useState<Step>(() => {
     if (!hasDirectCreateIntent) return "entry";
@@ -127,6 +128,8 @@ export default function CreateFlow() {
   const [selectedEvent, setEvent] = useState<EventType | null>(initialEvent);
   const [selectedPlatforms, setPlatforms] = useState<PlatformSlug[]>(DEFAULT_PLATFORMS);
   const [profile, setProfile] = useState<UserProfile>(getEmptyProfile);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [entitlements, setEntitlements] = useState<AppEntitlements>(getDefaultEntitlements);
   const [formValues, setFormValues] = useState<Record<string, string>>({
     name: "",
     role: "",
@@ -137,17 +140,16 @@ export default function CreateFlow() {
   const [accentColor, setAccentColor] = useState<AccentColor>("lime");
   const [profileShape, setProfileShape] = useState<ProfileShape>("rounded");
   const [layout, setLayout] = useState<Layout>("A");
-  const [badgeStyle, setBadgeStyle] = useState<BadgeStyle>("professional");
+  const [badgeStyle, setBadgeStyle] = useState<BadgeStyle>(startsInHackathonMode ? "minimal" : "professional");
   const [fontPair, setFontPair] = useState<FontPair>("classic");
   const [logoPlacement, setLogoPlacement] = useState<LogoPlacement>("bottom");
-  const [ctaStyle, setCtaStyle] = useState<CtaStyle>("follow");
-  const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>("aurora");
+  const [ctaStyle, setCtaStyle] = useState<CtaStyle>(startsInHackathonMode ? "none" : "follow");
+  const [backgroundPreset, setBackgroundPreset] = useState<BackgroundPreset>(startsInHackathonMode ? "grain" : "aurora");
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const [backgroundImageName, setBackgroundImageName] = useState<string | null>(null);
-  const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>("square");
+  const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>(startsInHackathonMode ? "linkedin" : "square");
   const [voice, setVoice] = useState<Voice>("professional");
   const [mood, setMood] = useState<Mood>("achievement");
-  const [watermark] = useState(false);
 
   const [captions, setCaptions] = useState<Partial<Record<PlatformSlug, PlatformContent>>>({});
   const [activePlatformTab, setActivePlatformTab] = useState<PlatformSlug>("linkedin");
@@ -155,32 +157,73 @@ export default function CreateFlow() {
   const [activeOutputTab, setActiveOutputTab] = useState<"graphic" | "captions">("graphic");
   const [isDownloading, setIsDownloading] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
 
+  const applyEventStyleDefaults = useCallback((eventType: EventType | null) => {
+    if (!eventType) return;
+
+    if (eventType.id === "hackathon-selected") {
+      setTheme("dark");
+      setAccentColor("lime");
+      setProfileShape("rounded");
+      setLayout("A");
+      setBadgeStyle("minimal");
+      setFontPair("classic");
+      setLogoPlacement("bottom");
+      setCtaStyle("none");
+      setBackgroundPreset("grain");
+      setDownloadFormat("linkedin");
+    }
+  }, []);
+
   useEffect(() => {
-    const syncProfile = () => {
-      const nextProfile = loadProfile();
-      setProfile(nextProfile);
-      setFormValues((prev) => ({
-        ...prev,
-        name: prev.name || nextProfile.name || "",
-        role: prev.role || nextProfile.role || "",
-        company: prev.company || nextProfile.company || "",
-      }));
-      setTheme((prev) => (prev === "dark" ? (nextProfile.brandTheme || "dark") : prev));
+    const syncProfile = async () => {
+      try {
+        const [nextProfile, nextTimeline, nextEntitlements] = await Promise.all([fetchProfile(), fetchTimeline(), fetchEntitlements()]);
+        setProfile(nextProfile);
+        setTimeline(nextTimeline);
+        setEntitlements(nextEntitlements);
+        setFormValues((prev) => ({
+          ...prev,
+          name: prev.name || nextProfile.name || "",
+          role: prev.role || nextProfile.role || "",
+          company: prev.company || nextProfile.company || "",
+        }));
+        setTheme((prev) => (prev === "dark" ? (nextProfile.brandTheme || "dark") : prev));
+      } catch (error) {
+        console.error(error);
+      }
     };
 
-    syncProfile();
-    window.addEventListener(PROFILE_UPDATED_EVENT, syncProfile);
-    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, syncProfile);
+    const handleProfileRefresh = () => {
+      void syncProfile();
+    };
+    const handleTimelineRefresh = () => {
+      void (async () => {
+        try {
+          setTimeline(await fetchTimeline());
+        } catch (error) {
+          console.error(error);
+        }
+      })();
+    };
+
+    void syncProfile();
+    window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileRefresh);
+    window.addEventListener(TIMELINE_UPDATED_EVENT, handleTimelineRefresh);
+    return () => {
+      window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileRefresh);
+      window.removeEventListener(TIMELINE_UPDATED_EVENT, handleTimelineRefresh);
+    };
   }, []);
 
   useEffect(() => {
     if (!reuseEventId) return;
 
-    const timelineEvent = loadTimeline().find((event) => event.id === reuseEventId);
+    const timelineEvent = timeline.find((event) => event.id === reuseEventId);
     if (!timelineEvent) return;
 
     const reusedEvent = EVENT_TYPES.find((eventType) => eventType.id === timelineEvent.eventTypeId);
@@ -195,6 +238,7 @@ export default function CreateFlow() {
       if (cancelled) return;
 
       setCategory(reusedEvent.category);
+      applyEventStyleDefaults(reusedEvent);
       setEvent(reusedEvent);
       setPlatforms(validPlatforms.length > 0 ? validPlatforms : DEFAULT_PLATFORMS);
       setFormValues((current) => ({ ...current, ...timelineEvent.values }));
@@ -205,7 +249,7 @@ export default function CreateFlow() {
     return () => {
       cancelled = true;
     };
-  }, [reuseEventId]);
+  }, [applyEventStyleDefaults, reuseEventId, timeline]);
 
   const handleFormBack = () => {
     if (cameFromTemplate) {
@@ -262,7 +306,7 @@ export default function CreateFlow() {
     setDownloadFormat(getDefaultFormatForPlatform(slug));
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!selectedEvent) return;
 
     const platformObjs = PLATFORMS.filter((platform) => selectedPlatforms.includes(platform.slug));
@@ -288,19 +332,23 @@ export default function CreateFlow() {
     setActiveOutputTab(graphicPlatforms.length > 0 ? "graphic" : "captions");
 
     const categoryMeta = EVENT_CATEGORIES.find((item) => item.slug === selectedEvent.category)!;
-    saveToTimeline({
-      id: `${selectedEvent.id}_${Date.now()}`,
-      eventTypeId: selectedEvent.id,
-      eventTypeLabel: selectedEvent.label,
-      eventTypeIcon: selectedEvent.icon,
-      category: categoryMeta.slug,
-      categoryColor: categoryMeta.color,
-      title: interpolate(selectedEvent.cardHeadline, formValues),
-      values: formValues,
-      platforms: selectedPlatforms,
-      captions: timelineCaptions,
-      createdAt: new Date().toISOString(),
-    });
+    try {
+      await saveToTimeline({
+        id: `${selectedEvent.id}_${Date.now()}`,
+        eventTypeId: selectedEvent.id,
+        eventTypeLabel: selectedEvent.label,
+        eventTypeIcon: selectedEvent.icon,
+        category: categoryMeta.slug,
+        categoryColor: categoryMeta.color,
+        title: interpolate(selectedEvent.cardHeadline, formValues),
+        values: formValues,
+        platforms: selectedPlatforms,
+        captions: timelineCaptions,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(error);
+    }
 
     setStep("output");
   };
@@ -316,12 +364,52 @@ export default function CreateFlow() {
   const profileSteps = profileCompletionSteps(profile);
   const profileCompletionPct = Math.round((profileSteps.filter((stepItem) => stepItem.done).length / profileSteps.length) * 100);
   const featuredTemplates = TEMPLATES.slice(0, 4);
+  const allowedThemes = entitlements.features.allowedThemes;
+  const selectedTheme = allowedThemes.includes(theme) ? theme : allowedThemes[0];
+  const watermark = entitlements.features.watermark;
 
   const handleDownload = useCallback(async () => {
     if (!cardRef.current) return;
 
     setIsDownloading(true);
+    setDownloadNotice(null);
     try {
+      const claimResponse = await fetch("/api/exports/claim", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          format: downloadFormat,
+          platform: activeGraphicMeta?.slug ?? null,
+          theme: selectedTheme,
+        }),
+      });
+
+      const claimPayload = await claimResponse.json().catch(() => null);
+
+      if (!claimResponse.ok) {
+        if (claimPayload?.entitlements) {
+          setEntitlements(claimPayload.entitlements);
+        }
+
+        setDownloadNotice(claimPayload?.error || "Unable to export right now.");
+        return;
+      }
+
+      if (claimPayload?.entitlements) {
+        setEntitlements(claimPayload.entitlements);
+        if (claimPayload.entitlements.plan === "free") {
+          const remaining = claimPayload.entitlements.downloadsRemaining;
+          setDownloadNotice(`Free plan export recorded. ${remaining} download${remaining === 1 ? "" : "s"} left this month.`);
+        } else if (claimPayload.entitlements.plan === "pro" && claimPayload.entitlements.planExpiresAt) {
+          setDownloadNotice(`Pro access is active until ${new Date(claimPayload.entitlements.planExpiresAt).toLocaleDateString("en-IN")}.`);
+        } else {
+          setDownloadNotice("Lifetime access is active.");
+        }
+      }
+
       const scale = Math.max(fmt.width / fmt.displayW, fmt.height / fmt.displayH);
       const dataUrl = await toPng(cardRef.current, {
         width: fmt.width,
@@ -341,7 +429,7 @@ export default function CreateFlow() {
     } finally {
       setIsDownloading(false);
     }
-  }, [downloadFormat, fmt, selectedEvent]);
+  }, [activeGraphicMeta, downloadFormat, fmt, selectedEvent, selectedTheme]);
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -370,8 +458,11 @@ export default function CreateFlow() {
     event: pickFirst(formValues, ["achievement", "event", "position", "price", "milestone", "date_time"], formValues.company || ""),
     productIdea: pickFirst(formValues, ["product_idea", "context", "skills", "abstract", "investors", "what_next", "website", "join_link"]),
     topLine: pickFirst(formValues, ["organizers", "website", "register_link", "subscribe_link", "github_url", "join_link", "platform"], formValues.company || ""),
+    eyebrow: buildGraphicEyebrow(selectedEvent, formValues),
+    headline: buildGraphicHeadline(selectedEvent, formValues),
+    footerLabel: buildGraphicFooter(formValues, profile.company || ""),
     photoUrl: profile.photoUrl,
-    theme,
+    theme: selectedTheme,
     accentColor,
     profileShape,
     layout,
@@ -711,7 +802,7 @@ export default function CreateFlow() {
                   <div style={{ fontSize: "14px", fontWeight: 700, color: "#f0f0f0", marginBottom: "6px" }}>{category.label}</div>
                   <div style={{ fontSize: "11px", color: "#666", lineHeight: 1.5 }}>{category.description}</div>
                   <div style={{ marginTop: "auto", paddingTop: "14px", fontSize: "10px", color: category.color, fontWeight: 700, letterSpacing: "0.02em" }}>
-                    {getEventsByCategory(category.slug).length} event types →
+                    {getEventsByCategory(category.slug).length} event types â†’
                     <span style={{ display: "block", opacity: 0.72, marginTop: "4px" }}>Custom option available</span>
                   </div>
                 </div>
@@ -724,7 +815,7 @@ export default function CreateFlow() {
           <div style={{ maxWidth: "980px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
               <button onClick={() => setStep("category")} style={backButtonStyle}>
-                ← Back
+                â† Back
               </button>
               <div>
                 <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#f0f0f0", margin: 0 }}>
@@ -739,6 +830,7 @@ export default function CreateFlow() {
                 <div
                   key={eventType.id}
                   onClick={() => {
+                    applyEventStyleDefaults(eventType);
                     setEvent(eventType);
                     setStep("platforms");
                   }}
@@ -793,7 +885,7 @@ export default function CreateFlow() {
           <div style={{ maxWidth: "980px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
               <button onClick={() => setStep("event")} style={backButtonStyle}>
-                ← Back
+                â† Back
               </button>
               <div>
                 <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#f0f0f0", margin: 0 }}>Where are you sharing?</h2>
@@ -874,7 +966,7 @@ export default function CreateFlow() {
                       </div>
                     </div>
                     {selected && (
-                      <div style={{ marginLeft: "auto", color: "#a3e635", fontSize: "12px" }}>✓</div>
+                      <div style={{ marginLeft: "auto", color: "#a3e635", fontSize: "12px" }}>âœ“</div>
                     )}
                   </div>
                 );
@@ -882,7 +974,7 @@ export default function CreateFlow() {
             </div>
             <div style={{ display: "flex", gap: "10px" }}>
               <button onClick={() => setStep("form")} style={primaryButtonStyle}>
-                Continue with {selectedPlatforms.length} platform{selectedPlatforms.length > 1 ? "s" : ""} →
+                Continue with {selectedPlatforms.length} platform{selectedPlatforms.length > 1 ? "s" : ""} â†’
               </button>
             </div>
           </div>
@@ -892,7 +984,7 @@ export default function CreateFlow() {
           <div style={{ maxWidth: "720px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
               <button onClick={handleFormBack} style={backButtonStyle}>
-                ← Back
+                â† Back
               </button>
               <div>
                 <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#f0f0f0", margin: 0 }}>
@@ -981,7 +1073,7 @@ export default function CreateFlow() {
                   cursor: hasMissingRequiredFields ? "not-allowed" : "pointer",
                 }}
               >
-                {hasMissingRequiredFields ? "Complete required fields to continue" : "Continue to Style →"}
+                {hasMissingRequiredFields ? "Complete required fields to continue" : "Continue to Style â†’"}
               </button>
             </div>
           </div>
@@ -992,7 +1084,7 @@ export default function CreateFlow() {
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
                 <button onClick={() => setStep("form")} style={backButtonStyle}>
-                  ← Back
+                  â† Back
                 </button>
                 <div>
                   <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#f0f0f0", margin: 0 }}>Customize the Style</h2>
@@ -1013,7 +1105,7 @@ export default function CreateFlow() {
                 <BtnGroup options={MOOD_OPTIONS.map((item) => ({ key: item.key, label: item.label }))} value={mood} onChange={(value) => setMood(value as Mood)} />
               </StyleSection>
               <StyleSection label="Theme">
-                <BtnGroup options={THEMES.map((item) => ({ key: item, label: item }))} value={theme} onChange={(value) => setTheme(value as Theme)} />
+                <BtnGroup options={allowedThemes.map((item) => ({ key: item, label: item }))} value={selectedTheme} onChange={(value) => setTheme(value as Theme)} />
               </StyleSection>
               <StyleSection label="Accent Color">
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -1192,6 +1284,13 @@ export default function CreateFlow() {
                 <p style={{ fontSize: "13px", color: "#555", margin: 0 }}>
                   Generated for {selectedPlatforms.length} platform{selectedPlatforms.length > 1 ? "s" : ""}
                 </p>
+                <p style={{ fontSize: "12px", color: "#6f6f6f", margin: "6px 0 0" }}>
+                  {entitlements.plan === "free"
+                    ? `${entitlements.downloadsRemaining} free downloads left this month. Free exports include watermark and 3 themes.`
+                    : entitlements.plan === "pro"
+                      ? `Pro access is active${entitlements.planExpiresAt ? ` until ${new Date(entitlements.planExpiresAt).toLocaleDateString("en-IN")}` : ""}.`
+                      : "Lifetime access is active."}
+                </p>
               </div>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button
@@ -1277,6 +1376,11 @@ export default function CreateFlow() {
                   <div style={{ fontSize: "11px", color: "#777", lineHeight: 1.5 }}>
                     Optimized for {activeGraphicMeta.label} with native export size {fmt.width}x{fmt.height}.
                   </div>
+                  {downloadNotice ? (
+                    <div style={{ fontSize: "11px", color: "#a3e635", lineHeight: 1.55 }}>
+                      {downloadNotice}
+                    </div>
+                  ) : null}
                   <div style={{ borderRadius: "10px", overflow: "hidden", boxShadow: "0 0 0 1px #1e1e1e, 0 16px 48px rgba(0,0,0,0.5)", width: "fit-content", maxWidth: "100%" }}>
                     <AchievementCard {...cardProps} />
                   </div>
@@ -1637,6 +1741,87 @@ function pickFirst(values: Record<string, string>, keys: string[], fallback = ""
   return fallback;
 }
 
+function normalizeText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function extractShowcaseTitle(value: string) {
+  const normalized = normalizeText(value);
+  if (!normalized) return "";
+
+  const aiBuildersMatch = normalized.match(/\bAI Builders Hackathon\b/i);
+  if (aiBuildersMatch) return "AI Builders Hackathon";
+
+  const eventMatch = normalized.match(/([A-Za-z0-9&+.-]+(?:\s+[A-Za-z0-9&+.-]+){0,4}\s(?:Hackathon|Summit|Conference|Award|Certification|Program|Fellowship|Bootcamp|Challenge|Scholarship))/i);
+  if (eventMatch) return eventMatch[1];
+
+  const sponsorSplit = normalized.split(/\s+x\s+/i);
+  if (sponsorSplit.length > 1) return sponsorSplit[sponsorSplit.length - 1].trim();
+
+  return normalized;
+}
+
+function buildGraphicHeadline(eventType: EventType | null, values: Record<string, string>) {
+  const achievement = extractShowcaseTitle(pickFirst(values, ["achievement", "event", "position", "price", "milestone", "date_time"]));
+  const company = normalizeText(values.company || "");
+  const role = normalizeText(values.role || "");
+
+  switch (eventType?.id) {
+    case "hackathon-selected":
+      return achievement ? `I've been shortlisted for ${achievement}` : "I've been shortlisted";
+    case "certification-earned":
+      return achievement ? `I earned ${achievement}` : "I earned a new certification";
+    case "award-winner":
+    case "competition-winner":
+      return achievement ? `I won ${achievement}` : "I won an award";
+    case "scholarship-winner":
+      return achievement ? `I received ${achievement}` : "I received a scholarship";
+    case "promotion":
+      return achievement ? `I'm now ${achievement}` : "I got promoted";
+    case "new-job":
+      if (company && role) return `I'm joining ${company} as ${role}`;
+      if (company) return `I'm joining ${company}`;
+      return "I'm starting a new role";
+    case "open-to-work":
+      return achievement ? `Open to ${achievement}` : "Open to new opportunities";
+    default:
+      return achievement || normalizeText(values.context || values.product_idea || values.company || "");
+  }
+}
+
+function buildGraphicEyebrow(eventType: EventType | null, values: Record<string, string>) {
+  const achievement = extractShowcaseTitle(pickFirst(values, ["achievement", "event", "position", "price", "milestone", "date_time"]));
+  const company = normalizeText(values.company || "");
+
+  switch (eventType?.id) {
+    case "hackathon-selected":
+      return achievement ? `Selected for ${achievement}` : "Selected for a major builders event";
+    case "certification-earned":
+      return "Certification earned";
+    case "award-winner":
+    case "competition-winner":
+      return "Award winner";
+    case "scholarship-winner":
+      return "Scholarship winner";
+    case "promotion":
+      return company ? `Career growth at ${company}` : "Career growth";
+    case "new-job":
+      return company ? `Joining ${company}` : "New role";
+    case "open-to-work":
+      return "Open to work";
+    default:
+      return eventType?.label || "Career milestone";
+  }
+}
+
+function buildGraphicFooter(values: Record<string, string>, fallbackCompany: string) {
+  return pickFirst(
+    values,
+    ["organizers", "website", "register_link", "subscribe_link", "github_url", "join_link", "platform"],
+    values.company || fallbackCompany || "SuperSmartX"
+  );
+}
+
 function supportsGraphicPreview(slug: PlatformSlug) {
   return PLATFORMS.find((platform) => platform.slug === slug)?.outputTypes.includes("graphic") ?? false;
 }
@@ -1764,4 +1949,9 @@ const inputStyle: React.CSSProperties = {
   transition: "border-color 0.2s",
   boxSizing: "border-box",
 };
+
+
+
+
+
 
