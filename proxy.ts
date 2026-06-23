@@ -1,7 +1,7 @@
 ﻿import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const APP_ROUTE_PREFIXES = ["/dashboard", "/create", "/timeline", "/profile", "/templates", "/payment/checkout"];
+const APP_ROUTE_PREFIXES = ["/dashboard", "/timeline", "/profile", "/payment/checkout"];
 const AUTH_PAGES = ["/sign-in", "/sign-up"];
 const AUTH_API_PREFIXES = ["/api/profile", "/api/timeline", "/api/checkout", "/api/payment/orders"];
 
@@ -74,6 +74,7 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
+
 
 
 

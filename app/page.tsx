@@ -1,11 +1,24 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import styles from "./page.module.css";
 
 const STATS = [
-  { label: "Profile Setup", value: "Once" },
-  { label: "Career Templates", value: "10+" },
-  { label: "Platform Variants", value: "12" },
-  { label: "First Draft", value: "60 sec" },
+  { label: "Profile setup", value: "Once" },
+  { label: "First template", value: "No login" },
+  { label: "Career paths", value: "6" },
+  { label: "Platform outputs", value: "12" },
+];
+
+const SAMPLES = [
+  "Promotion post",
+  "Certification graphic",
+  "Open to work card",
+  "Internship update",
+];
+
+const TRUST = [
+  "Built for LinkedIn-first career posts",
+  "One profile reused across every milestone",
+  "First generation fully unlocked",
 ];
 
 export default function RootPage() {
@@ -31,23 +44,21 @@ export default function RootPage() {
 
         <div className={styles.hero}>
           <div className={styles.copy}>
-            <div className={styles.eyebrow}>
-              The LinkedIn milestone tool
-            </div>
+            <div className={styles.eyebrow}>The LinkedIn milestone tool</div>
             <h1 className={styles.title}>
-              Set up once. Post every career win beautifully.
+              Set up your profile once. Turn career updates into LinkedIn-ready posts in seconds.
             </h1>
             <p className={styles.description}>
-              Turn promotions, new jobs, certifications, internships, and open-to-work
-              updates into LinkedIn-ready graphics and captions. Your saved profile fills
-              the details in every time.
+              Generate your first template instantly - no email required. Promotions, certifications,
+              internships, open-to-work updates, and founder wins all become polished graphics with
+              platform-aware copy.
             </p>
             <div className={styles.ctaRow}>
               <Link href="/create" className={styles.primaryCta}>
-                Create Your First Post
+                Generate First Template
               </Link>
               <Link href="/templates" className={styles.secondaryCta}>
-                Browse Templates
+                View Template Library
               </Link>
             </div>
             <div className={styles.stats}>
@@ -63,20 +74,18 @@ export default function RootPage() {
           <div className={styles.preview}>
             <div className={styles.previewTop}>
               <div>
-                <div className={styles.previewLabel}>Live Preview</div>
-                <div className={styles.previewTitle}>Career Milestone</div>
+                <div className={styles.previewLabel}>Live preview</div>
+                <div className={styles.previewTitle}>Career milestone output</div>
               </div>
-              <div className={styles.previewBadge}>Profile Once</div>
+              <div className={styles.previewBadge}>Profile once</div>
             </div>
 
             <div className={styles.previewCard}>
-              <div className={styles.previewCardLabel}>LinkedIn First</div>
-              <div className={styles.previewCardTitle}>
-                Promoted to Senior Software Engineer
-              </div>
+              <div className={styles.previewCardLabel}>LinkedIn feed 1080 x 1350</div>
+              <div className={styles.previewCardTitle}>Promoted to Senior Software Engineer</div>
               <div className={styles.previewCardCopy}>
-                One saved profile becomes a polished graphic, a thoughtful LinkedIn
-                caption, and shorter variants for every other platform.
+                One saved profile becomes a polished graphic, a complete LinkedIn caption, and clean
+                variants for X, Instagram, and community platforms.
               </div>
               <div className={styles.previewPerson}>
                 <div className={styles.previewAvatar} />
@@ -87,22 +96,26 @@ export default function RootPage() {
               </div>
             </div>
 
-            <div className={styles.previewInfo}>
-              <div className={styles.previewInfoCard}>
-                <div className={styles.previewInfoLabel}>Output</div>
-                <div className={styles.previewInfoCopy}>
-                  LinkedIn graphic, caption, and platform-aware variants
+            <div className={styles.sampleStrip}>
+              {SAMPLES.map((sample) => (
+                <div key={sample} className={styles.sampleChip}>
+                  {sample}
                 </div>
-              </div>
-              <div className={styles.previewInfoCard}>
-                <div className={styles.previewInfoLabel}>Flow</div>
-                <div className={styles.previewInfoCopy}>
-                  Save profile once, choose the milestone, export in minutes
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
+
+        <section className={styles.socialProof}>
+          <div className={styles.socialProofLabel}>Why people keep using it</div>
+          <div className={styles.socialProofGrid}>
+            {TRUST.map((item) => (
+              <div key={item} className={styles.socialProofCard}>
+                {item}
+              </div>
+            ))}
+          </div>
+        </section>
       </section>
     </main>
   );

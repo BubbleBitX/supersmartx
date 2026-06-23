@@ -1,5 +1,5 @@
-import { AccessGrantStatus, BillingInterval, Prisma, UsageEventKind, UserPlan } from "@prisma/client";
-import type { AppEntitlements, EffectivePlan } from "@/lib/entitlements";
+﻿import { AccessGrantStatus, BillingInterval, Prisma, UsageEventKind, UserPlan } from "@prisma/client";
+import type { AppEntitlements, EffectivePlan, AccessStatus } from "@/lib/entitlements";
 import { FREE_THEME_KEYS, PAID_THEME_KEYS } from "@/lib/entitlements";
 import { prisma } from "@/lib/prisma";
 
@@ -20,6 +20,7 @@ function sameDate(a: Date | null | undefined, b: Date | null | undefined) {
 }
 
 function buildEntitlements(input: {
+  accessStatus: AccessStatus;
   downloadsUsedThisPeriod: number;
   plan: EffectivePlan;
   planExpiresAt: Date | null;
@@ -29,7 +30,7 @@ function buildEntitlements(input: {
 
   return {
     plan: input.plan,
-    accessStatus: paid ? "active" : "free",
+    accessStatus: input.accessStatus,
     planExpiresAt: input.planExpiresAt ? input.planExpiresAt.toISOString() : null,
     downloadsUsedThisPeriod: input.downloadsUsedThisPeriod,
     downloadsRemaining,
@@ -77,17 +78,32 @@ async function syncUserAccessState(userId: string) {
     orderBy: [{ endsAt: "desc" }, { createdAt: "desc" }],
   });
 
+  const latestGrant = await prisma.accessGrant.findFirst({
+    where: { userId },
+    select: {
+      plan: true,
+      status: true,
+      endsAt: true,
+    },
+    orderBy: [{ endsAt: "desc" }, { createdAt: "desc" }],
+  });
+
   let effectivePlan: EffectivePlan = "free";
   let planExpiresAt: Date | null = null;
+  let accessStatus: AccessStatus = "free";
 
   const lifetimeGrant = grants.find((grant) => grant.plan === UserPlan.lifetime && grant.endsAt === null);
   if (lifetimeGrant) {
     effectivePlan = "lifetime";
+    accessStatus = "active";
   } else {
     const activeProGrant = grants.find((grant) => grant.plan === UserPlan.pro && grant.endsAt && grant.endsAt > now);
     if (activeProGrant?.endsAt) {
       effectivePlan = "pro";
       planExpiresAt = activeProGrant.endsAt;
+      accessStatus = "active";
+    } else if (latestGrant && latestGrant.plan !== UserPlan.free && latestGrant.status !== AccessGrantStatus.active) {
+      accessStatus = "expired";
     }
   }
 
@@ -101,7 +117,7 @@ async function syncUserAccessState(userId: string) {
     });
   }
 
-  return { plan: effectivePlan, planExpiresAt };
+  return { accessStatus, plan: effectivePlan, planExpiresAt };
 }
 
 async function getDownloadUsageForCurrentPeriod(userId: string) {
@@ -127,6 +143,7 @@ export async function getUserEntitlements(userId: string) {
   const usage = await getDownloadUsageForCurrentPeriod(userId);
 
   return buildEntitlements({
+    accessStatus: access.accessStatus,
     plan: access.plan,
     planExpiresAt: access.planExpiresAt,
     downloadsUsedThisPeriod: usage.count,

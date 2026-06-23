@@ -1,4 +1,4 @@
-import {
+﻿import {
   BillingInterval,
   PaymentProvider,
   PaymentStatus,
@@ -40,6 +40,12 @@ export async function getPaymentOrderForUser(input: { providerOrderId: string; u
   });
 }
 
+export async function getLatestPaymentOrderForUser(userId: string) {
+  return prisma.paymentOrder.findFirst({
+    where: { userId },
+    orderBy: [{ createdAt: "desc" }],
+  });
+}
 export async function getPaymentOrderByProviderOrderId(providerOrderId: string) {
   return prisma.paymentOrder.findUnique({
     where: { providerOrderId },
@@ -196,3 +202,4 @@ export async function updateWebhookEventState(input: {
     },
   });
 }
+

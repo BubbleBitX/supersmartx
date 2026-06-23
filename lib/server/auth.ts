@@ -1,4 +1,5 @@
-import type { User } from "@supabase/supabase-js";
+﻿import type { User } from "@supabase/supabase-js";
+import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -24,6 +25,17 @@ export async function requireAuthenticatedUser() {
     throw new Error("UNAUTHORIZED");
   }
 
+  return user;
+}
+
+export async function requireAuthenticatedPage(nextPath: string) {
+  const user = await getAuthenticatedUser();
+
+  if (!user) {
+    redirect(`/sign-in?next=${encodeURIComponent(nextPath)}`);
+  }
+
+  await ensureDatabaseUser(user);
   return user;
 }
 

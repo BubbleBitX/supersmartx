@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type OrderState = "created" | "pending" | "paid" | "failed" | "cancelled";
 type BillingInterval = "none" | "days30" | "lifetime";
@@ -22,6 +22,10 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function StatusMessage({ color, children }: { color: string; children: ReactNode }) {
+  return <p style={{ fontSize: "12px", color, margin: "0 0 24px", lineHeight: 1.6 }}>{children}</p>;
+}
+
 export default function PaymentSuccessStatus({ orderId }: { orderId: string }) {
   const [payload, setPayload] = useState<OrderPayload | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -29,6 +33,7 @@ export default function PaymentSuccessStatus({ orderId }: { orderId: string }) {
   useEffect(() => {
     let cancelled = false;
     let attempts = 0;
+    let retryTimer: number | null = null;
 
     const load = async () => {
       try {
@@ -36,6 +41,14 @@ export default function PaymentSuccessStatus({ orderId }: { orderId: string }) {
           credentials: "include",
           cache: "no-store",
         });
+
+        if (response.status === 401) {
+          throw new Error("Sign in again to confirm your billing status.");
+        }
+
+        if (response.status === 404) {
+          throw new Error("We could not find this payment record.");
+        }
 
         if (!response.ok) {
           throw new Error("Unable to confirm payment status yet.");
@@ -46,10 +59,12 @@ export default function PaymentSuccessStatus({ orderId }: { orderId: string }) {
           return;
         }
 
+        setErrorMessage(null);
         setPayload(nextPayload);
-        if (nextPayload.order.status !== "paid" && attempts < 10) {
+
+        if ((nextPayload.order.status === "created" || nextPayload.order.status === "pending") && attempts < 10) {
           attempts += 1;
-          window.setTimeout(() => {
+          retryTimer = window.setTimeout(() => {
             void load();
           }, 2000);
         }
@@ -63,40 +78,46 @@ export default function PaymentSuccessStatus({ orderId }: { orderId: string }) {
     };
 
     void load();
+
     return () => {
       cancelled = true;
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer);
+      }
     };
   }, [orderId]);
 
   if (errorMessage) {
-    return (
-      <p style={{ fontSize: "12px", color: "#9b7f7f", margin: "0 0 24px", lineHeight: 1.6 }}>
-        {errorMessage}
-      </p>
-    );
+    return <StatusMessage color="#d3a3a3">{errorMessage}</StatusMessage>;
   }
 
-  if (payload?.order.status === "paid") {
+  if (!payload) {
+    return <StatusMessage color="#8d8d8d">Checking your payment status.</StatusMessage>;
+  }
+
+  if (payload.order.status === "paid") {
     if (payload.order.billingInterval === "lifetime") {
-      return (
-        <p style={{ fontSize: "13px", color: "#a3e635", margin: "0 0 24px", lineHeight: 1.6 }}>
-          Lifetime access is active now.
-        </p>
-      );
+      return <StatusMessage color="#a3e635">Lifetime access is active now.</StatusMessage>;
     }
 
     if (payload.order.accessEndsAt) {
-      return (
-        <p style={{ fontSize: "13px", color: "#a3e635", margin: "0 0 24px", lineHeight: 1.6 }}>
-          Pro access is active through {formatDate(payload.order.accessEndsAt)}.
-        </p>
-      );
+      return <StatusMessage color="#a3e635">Pro access is active through {formatDate(payload.order.accessEndsAt)}.</StatusMessage>;
     }
+
+    return <StatusMessage color="#a3e635">Payment confirmed. Your paid access is active now.</StatusMessage>;
+  }
+
+  if (payload.order.status === "failed") {
+    return <StatusMessage color="#fda4af">Payment failed. You can try checkout again from pricing.</StatusMessage>;
+  }
+
+  if (payload.order.status === "cancelled") {
+    return <StatusMessage color="#fbcfe8">Payment was cancelled. No paid access was added.</StatusMessage>;
   }
 
   return (
-    <p style={{ fontSize: "12px", color: "#8d8d8d", margin: "0 0 24px", lineHeight: 1.6 }}>
+    <StatusMessage color="#8d8d8d">
       Payment received. Access activation can take a few seconds while we confirm the webhook.
-    </p>
+    </StatusMessage>
   );
 }

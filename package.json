@@ -8,9 +8,12 @@
     "start": "next start",
     "db:generate": "prisma generate --schema prisma/schema.prisma",
     "db:push": "prisma db push --schema prisma/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
+    "db:migrate:status": "prisma migrate status --schema prisma/schema.prisma",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run lint && npm run typecheck && npm run build"
+    "launch:check": "node scripts/validate-production.mjs",
+    "verify": "npm run lint && npm run typecheck && npm run launch:check && npm run build"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

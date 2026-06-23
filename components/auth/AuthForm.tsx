@@ -21,11 +21,13 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const [googlePending, setGooglePending] = useState(false);
+  const [oauthPending, setOAuthPending] = useState<"google" | "github" | null>(null);
 
   const isSignUp = mode === "sign-up";
   const nextPath = useMemo(() => normalizeNextPath(searchParams.get("next")), [searchParams]);
   const googleEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE_AUTH === "true";
+  const githubEnabled = process.env.NEXT_PUBLIC_ENABLE_GITHUB_AUTH === "true";
+  const hasOAuthProvider = googleEnabled || githubEnabled;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -74,8 +76,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     }
   };
 
-  const handleGoogleAuth = async () => {
-    setGooglePending(true);
+  const handleOAuth = async (provider: "google" | "github") => {
+    setOAuthPending(provider);
     setError("");
     setMessage("");
 
@@ -83,13 +85,17 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       const supabase = getSupabaseBrowserClient();
       const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+        provider,
         options: {
           redirectTo,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
+          ...(provider === "google"
+            ? {
+                queryParams: {
+                  access_type: "offline",
+                  prompt: "consent",
+                },
+              }
+            : {}),
         },
       });
 
@@ -97,7 +103,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         setError(oauthError.message);
       }
     } finally {
-      setGooglePending(false);
+      setOAuthPending(null);
     }
   };
 
@@ -131,27 +137,51 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             : "Sign in to access your profile, saved work, and production data."}
         </div>
 
-        {googleEnabled && (
+        {hasOAuthProvider && (
           <>
-            <button
-              type="button"
-              onClick={() => void handleGoogleAuth()}
-              disabled={pending || googlePending}
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                background: "#fff",
-                color: "#111",
-                fontSize: "13px",
-                fontWeight: 700,
-                borderRadius: "10px",
-                border: "1px solid #d9d9d9",
-                cursor: pending || googlePending ? "not-allowed" : "pointer",
-                marginBottom: "14px",
-              }}
-            >
-              {googlePending ? "Redirecting to Google..." : `${isSignUp ? "Continue" : "Sign in"} with Google`}
-            </button>
+            <div style={{ display: "grid", gap: "10px", marginBottom: "14px" }}>
+              {googleEnabled && (
+                <button
+                  type="button"
+                  onClick={() => void handleOAuth("google")}
+                  disabled={pending || !!oauthPending}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    background: "#fff",
+                    color: "#111",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    borderRadius: "10px",
+                    border: "1px solid #d9d9d9",
+                    cursor: pending || !!oauthPending ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {oauthPending === "google" ? "Redirecting to Google..." : `${isSignUp ? "Continue" : "Sign in"} with Google`}
+                </button>
+              )}
+
+              {githubEnabled && (
+                <button
+                  type="button"
+                  onClick={() => void handleOAuth("github")}
+                  disabled={pending || !!oauthPending}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    background: "#161616",
+                    color: "#f5f5f5",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    borderRadius: "10px",
+                    border: "1px solid #2a2a2a",
+                    cursor: pending || !!oauthPending ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {oauthPending === "github" ? "Redirecting to GitHub..." : `${isSignUp ? "Continue" : "Sign in"} with GitHub`}
+                </button>
+              )}
+            </div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
               <div style={{ flex: 1, height: "1px", background: "#242424" }} />
               <div style={{ fontSize: "11px", color: "#666" }}>or use email</div>
@@ -193,7 +223,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
 
           <button
             type="submit"
-            disabled={pending || googlePending}
+            disabled={pending || !!oauthPending}
             style={{
               padding: "12px 14px",
               background: pending ? "#2c3d12" : "#a3e635",
@@ -202,7 +232,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
               fontWeight: 700,
               borderRadius: "10px",
               border: "none",
-              cursor: pending || googlePending ? "not-allowed" : "pointer",
+              cursor: pending || !!oauthPending ? "not-allowed" : "pointer",
             }}
           >
             {pending ? "Working..." : isSignUp ? "Create account" : "Sign in"}
@@ -239,19 +269,22 @@ const labelStyle: React.CSSProperties = {
 };
 
 const errorStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  background: "#2a1111",
-  border: "1px solid #5a2020",
-  borderRadius: "10px",
+  background: "rgba(220, 38, 38, 0.12)",
+  border: "1px solid rgba(248, 113, 113, 0.28)",
   color: "#fca5a5",
+  borderRadius: "10px",
+  padding: "10px 12px",
   fontSize: "12px",
+  lineHeight: 1.5,
 };
 
 const messageStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  background: "#14210e",
-  border: "1px solid #304d1f",
+  background: "rgba(163, 230, 53, 0.08)",
+  border: "1px solid rgba(163, 230, 53, 0.2)",
+  color: "#d9f99d",
   borderRadius: "10px",
-  color: "#d4f4a0",
+  padding: "10px 12px",
   fontSize: "12px",
+  lineHeight: 1.5,
 };
+

@@ -7,6 +7,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fetchProfile, getEmptyProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
 import { fetchTimeline, TimelineEvent, TIMELINE_UPDATED_EVENT } from "@/lib/timeline";
+import { fetchEntitlements, getDefaultEntitlements, type AppEntitlements } from "@/lib/entitlements";
+import { formatPlanName, getPlanDetail, getPlanHeadline } from "@/lib/billing";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const NAV_ITEMS = [
@@ -18,37 +20,101 @@ const NAV_ITEMS = [
   { href: "/pricing", icon: "tag", label: "Pricing" },
 ];
 
+const PUBLIC_APP_PATHS = ["/create", "/templates"];
+const PROTECTED_APP_PATHS = ["/dashboard", "/timeline", "/profile"];
+
+function matchesAppPath(pathname: string, paths: string[]) {
+  return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile>(getEmptyProfile);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [entitlements, setEntitlements] = useState<AppEntitlements>(getDefaultEntitlements);
   const [hasMounted, setHasMounted] = useState(false);
+  const [authResolved, setAuthResolved] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const isPublicSurface = matchesAppPath(pathname, PUBLIC_APP_PATHS);
+  const isProtectedSurface = matchesAppPath(pathname, PROTECTED_APP_PATHS);
+
   useEffect(() => {
-    const refresh = async () => {
+    const supabase = getSupabaseBrowserClient();
+    let cancelled = false;
+
+    const syncWorkspace = async () => {
       try {
-        const [nextProfile, nextTimeline] = await Promise.all([fetchProfile(), fetchTimeline()]);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (cancelled) return;
+
+        const nextIsAuthenticated = !!user;
+        setIsAuthenticated(nextIsAuthenticated);
+
+        if (!nextIsAuthenticated) {
+          setProfile(getEmptyProfile());
+          setTimeline([]);
+          setEntitlements(getDefaultEntitlements());
+          setAuthResolved(true);
+
+          if (isProtectedSurface) {
+            router.replace(`/sign-in?next=${encodeURIComponent(pathname || "/dashboard")}`);
+          }
+          return;
+        }
+
+        if (isPublicSurface) {
+          setAuthResolved(true);
+          return;
+        }
+
+        const [nextProfile, nextTimeline, nextEntitlements] = await Promise.all([
+          fetchProfile(),
+          fetchTimeline(),
+          fetchEntitlements(),
+        ]);
+
+        if (cancelled) return;
+
         setProfile(nextProfile);
         setTimeline(nextTimeline);
+        setEntitlements(nextEntitlements);
+        setAuthResolved(true);
       } catch (error) {
+        if (cancelled) return;
         console.error(error);
+        setAuthResolved(true);
       }
     };
 
-    void refresh();
+    if (isPublicSurface) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void syncWorkspace();
+
     const handleRefresh = () => {
-      void refresh();
+      void syncWorkspace();
     };
+
+    const authSubscription = supabase.auth.onAuthStateChange(() => {
+      void syncWorkspace();
+    });
+
     window.addEventListener(PROFILE_UPDATED_EVENT, handleRefresh);
     window.addEventListener(TIMELINE_UPDATED_EVENT, handleRefresh);
     return () => {
+      cancelled = true;
+      authSubscription.data.subscription.unsubscribe();
       window.removeEventListener(PROFILE_UPDATED_EVENT, handleRefresh);
       window.removeEventListener(TIMELINE_UPDATED_EVENT, handleRefresh);
     };
-  }, []);
+  }, [isProtectedSurface, isPublicSurface, pathname, router]);
 
   useEffect(() => {
     // Intentional mount handshake so the first client render matches the server placeholder.
@@ -82,7 +148,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const recentTimeline = timeline.slice(0, 3);
   const meta = getWorkspaceMeta(pathname, latestEvent);
 
-  if (!hasMounted) {
+  if (isPublicSurface) {
+    return <>{children}</>;
+  }
+
+  if (!hasMounted || !authResolved || (isProtectedSurface && !isAuthenticated)) {
     return (
       <div
         style={{
@@ -191,7 +261,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 >
                   {profile.name || "Your workspace"}
                 </div>
-                <div style={{ fontSize: "10px", color: "#7f7a71", marginTop: "2px" }}>SuperSmartX</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px", flexWrap: "wrap" }}>
+                  <div style={{ fontSize: "10px", color: "#7f7a71" }}>SuperSmartX</div>
+                  <PlanBadge plan={entitlements.plan} />
+                </div>
               </div>
             </div>
 
@@ -255,6 +328,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {completionPct < 100 ? "Complete profile" : "Review profile"}
               </Link>
             </div>
+
+            <BillingStatusCard entitlements={entitlements} compact={true} />
 
             <button
               onClick={() => void handleSignOut()}
@@ -354,6 +429,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <RightRail
                 meta={meta}
                 completionPct={completionPct}
+                entitlements={entitlements}
                 latestEvent={latestEvent}
                 recentTimeline={recentTimeline}
               />
@@ -368,11 +444,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 function RightRail({
   meta,
   completionPct,
+  entitlements,
   latestEvent,
   recentTimeline,
 }: {
   meta: WorkspaceMeta;
   completionPct: number;
+  entitlements: AppEntitlements;
   latestEvent: TimelineEvent | null;
   recentTimeline: TimelineEvent[];
 }) {
@@ -393,6 +471,12 @@ function RightRail({
         </div>
         <Link href="/profile" style={secondaryButtonStyle}>
           {completionPct < 100 ? "Complete profile setup" : "Open profile"}
+        </Link>
+      </RailCard>
+
+      <RailCard eyebrow="Billing" title={getPlanHeadline(entitlements)} copy={getPlanDetail(entitlements)}>
+        <Link href="/pricing" style={secondaryButtonStyle}>
+          {entitlements.plan === "free" ? "Upgrade plan" : "Open pricing"}
         </Link>
       </RailCard>
 
@@ -459,6 +543,97 @@ function RailCard({
   );
 }
 
+function PlanBadge({ plan }: { plan: AppEntitlements["plan"] }) {
+  const tone = getPlanTone(plan);
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "20px",
+        padding: "0 8px",
+        borderRadius: "999px",
+        background: tone.background,
+        border: `1px solid ${tone.border}`,
+        color: tone.color,
+        fontSize: "10px",
+        fontWeight: 800,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+      }}
+    >
+      {formatPlanName(plan)}
+    </span>
+  );
+}
+
+function BillingStatusCard({
+  entitlements,
+  compact = false,
+}: {
+  entitlements: AppEntitlements;
+  compact?: boolean;
+}) {
+  const tone = getPlanTone(entitlements.plan);
+
+  return (
+    <div style={sidebarCardStyle}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "10px" }}>
+        <div style={{ fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#777269" }}>Billing</div>
+        <PlanBadge plan={entitlements.plan} />
+      </div>
+      <div style={{ fontSize: compact ? "18px" : "20px", fontWeight: 800, color: "#f3efe6", lineHeight: 1.15, marginBottom: "6px" }}>
+        {getPlanHeadline(entitlements)}
+      </div>
+      <div style={{ fontSize: "11px", color: "#8e897f", lineHeight: 1.6, marginBottom: "12px" }}>
+        {getPlanDetail(entitlements)}
+      </div>
+      <div
+        style={{
+          padding: "10px 11px",
+          borderRadius: "14px",
+          background: tone.background,
+          border: `1px solid ${tone.border}`,
+          color: tone.color,
+          fontSize: "11px",
+          fontWeight: 700,
+          marginBottom: "12px",
+        }}
+      >
+        {entitlements.plan === "free" ? "Upgrade to remove limits." : "Billing is tracked on your account."}
+      </div>
+      <Link href="/pricing" style={secondaryButtonStyle}>
+        {entitlements.plan === "free" ? "Upgrade plan" : "View pricing"}
+      </Link>
+    </div>
+  );
+}
+
+function getPlanTone(plan: AppEntitlements["plan"]) {
+  if (plan === "lifetime") {
+    return {
+      background: "rgba(241,199,109,0.12)",
+      border: "rgba(241,199,109,0.24)",
+      color: "#f1c76d",
+    };
+  }
+
+  if (plan === "pro") {
+    return {
+      background: "rgba(182,245,77,0.12)",
+      border: "rgba(182,245,77,0.24)",
+      color: "#c8f26c",
+    };
+  }
+
+  return {
+    background: "rgba(255,255,255,0.05)",
+    border: "rgba(255,255,255,0.08)",
+    color: "#c8c1b5",
+  };
+}
 function AvatarPlaceholder() {
   return (
     <div
@@ -731,5 +906,8 @@ const softCardStyle: CSSProperties = {
   background: "rgba(255,255,255,0.03)",
   border: "1px solid rgba(255,255,255,0.06)",
 };
+
+
+
 
 

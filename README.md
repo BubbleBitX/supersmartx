@@ -120,6 +120,20 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Production deployment
+
+Copy `.env.example` to `.env` and fill in your production secrets. Then run:
+
+```bash
+npm run launch:check
+npm run verify
+npm run build
+```
+
+The production app URL should be `https://supersmartx.com`.
+
+For Supabase OAuth, add `https://supersmartx.com/auth/callback` as a redirect URL in your Supabase auth provider settings.
+
 ## Useful commands
 
 ```bash

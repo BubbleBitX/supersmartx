@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Link from "next/link";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toPng } from "html-to-image";
@@ -47,7 +48,9 @@ import {
 } from "@/lib/templates";
 import { fetchProfile, getEmptyProfile, PROFILE_UPDATED_EVENT, profileCompletionSteps, UserProfile } from "@/lib/profile";
 import { fetchEntitlements, getDefaultEntitlements, type AppEntitlements } from "@/lib/entitlements";
+import { clearGuestDraft, getEmptyGuestDraft, readGuestDraft, writeGuestDraft } from "@/lib/guest-create";
 import { getCreateHrefForTemplateId, getEventTypeIdForTemplateId } from "@/lib/routing";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { fetchTimeline, saveToTimeline, TIMELINE_UPDATED_EVENT, TimelineEvent } from "@/lib/timeline";
 import AchievementCard from "@/components/AchievementCard";
 
@@ -108,6 +111,7 @@ export default function CreateFlow() {
   const searchParams = useSearchParams();
   const selectedTemplateId = searchParams.get("template");
   const reuseEventId = searchParams.get("reuse");
+  const resumeGuestSession = searchParams.get("resume") === "guest";
   const requestedEventTypeId = searchParams.get("eventType")
     || (selectedTemplateId ? getEventTypeIdForTemplateId(selectedTemplateId) : null);
   const initialEvent = requestedEventTypeId
@@ -158,9 +162,15 @@ export default function CreateFlow() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMessage, setAuthMessage] = useState("You're on a roll! Create an account to save your work and unlock unlimited generations.");
+  const [reuseSourceCreatedAt, setReuseSourceCreatedAt] = useState<string | null>(null);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
+  const guestMigrationAttemptedRef = useRef(false);
+  const restoredDraftRef = useRef(false);
 
   const applyEventStyleDefaults = useCallback((eventType: EventType | null) => {
     if (!eventType) return;
@@ -179,9 +189,82 @@ export default function CreateFlow() {
     }
   }, []);
 
+  const openAuthGate = useCallback((message?: string) => {
+    setAuthMessage(message || "You're on a roll! Create an account to save your work and unlock unlimited generations.");
+    setAuthModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (restoredDraftRef.current) return;
+    if (!resumeGuestSession && (hasDirectCreateIntent || reuseEventId)) return;
+
+    const draft = readGuestDraft();
+    if (!draft) return;
+
+    restoredDraftRef.current = true;
+
+    const restoredEvent = draft.selectedEventId
+      ? EVENT_TYPES.find((eventType) => eventType.id === draft.selectedEventId) ?? null
+      : null;
+    const restoredCategory = (draft.selectedCategory as EventCategorySlug | null) ?? restoredEvent?.category ?? null;
+    let cancelled = false;
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+
+      if (restoredEvent) {
+        setEvent(restoredEvent);
+      }
+
+      setCategory(restoredCategory);
+      setPlatforms(draft.selectedPlatforms.length > 0 ? draft.selectedPlatforms : DEFAULT_PLATFORMS);
+      setFormValues((current) => ({ ...current, ...draft.formValues }));
+      setTheme(draft.theme);
+      setAccentColor(draft.accentColor);
+      setProfileShape(draft.profileShape);
+      setLayout(draft.layout);
+      setBadgeStyle(draft.badgeStyle);
+      setFontPair(draft.fontPair);
+      setLogoPlacement(draft.logoPlacement);
+      setCtaStyle(draft.ctaStyle);
+      setBackgroundPreset(draft.backgroundPreset);
+      setDownloadFormat(draft.downloadFormat);
+      setVoice(draft.voice);
+      setMood(draft.mood);
+      setCaptions(draft.captions as Partial<Record<PlatformSlug, PlatformContent>>);
+      setActivePlatformTab(draft.activePlatformTab || "linkedin");
+      setActiveGraphicPlatform(draft.activeGraphicPlatform || "linkedin");
+      setActiveOutputTab(draft.activeOutputTab);
+      setBackgroundImageUrl(draft.backgroundImageUrl ?? null);
+      setBackgroundImageName(draft.backgroundImageName ?? null);
+      setReuseSourceCreatedAt(draft.reuseSourceCreatedAt);
+      setStep(draft.step);
+
+      if (draft.generatedGuestEvent) {
+        setDownloadNotice("Restored your first free draft from this browser.");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyEventStyleDefaults, hasDirectCreateIntent, resumeGuestSession, reuseEventId]);
+
   useEffect(() => {
     const syncProfile = async () => {
       try {
+        const supabase = getSupabaseBrowserClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        const nextIsAuthenticated = !!user;
+        setIsAuthenticated(nextIsAuthenticated);
+
+        if (!nextIsAuthenticated) {
+          setProfile(getEmptyProfile());
+          setTimeline([]);
+          setEntitlements(getDefaultEntitlements());
+          return;
+        }
+
         const [nextProfile, nextTimeline, nextEntitlements] = await Promise.all([fetchProfile(), fetchTimeline(), fetchEntitlements()]);
         setProfile(nextProfile);
         setTimeline(nextTimeline);
@@ -194,6 +277,7 @@ export default function CreateFlow() {
         }));
         setTheme((prev) => (prev === "dark" ? (nextProfile.brandTheme || "dark") : prev));
       } catch (error) {
+        setIsAuthenticated(false);
         console.error(error);
       }
     };
@@ -211,14 +295,107 @@ export default function CreateFlow() {
       })();
     };
 
+    const supabase = getSupabaseBrowserClient();
+    const authSubscription = supabase.auth.onAuthStateChange(() => {
+      void syncProfile();
+    });
+
     void syncProfile();
     window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileRefresh);
     window.addEventListener(TIMELINE_UPDATED_EVENT, handleTimelineRefresh);
     return () => {
+      authSubscription.data.subscription.unsubscribe();
       window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileRefresh);
       window.removeEventListener(TIMELINE_UPDATED_EVENT, handleTimelineRefresh);
     };
   }, []);
+
+  useEffect(() => {
+    const persistedDraft = readGuestDraft();
+    const draft = {
+      ...getEmptyGuestDraft(),
+      selectedCategory,
+      selectedEventId: selectedEvent?.id ?? null,
+      selectedPlatforms,
+      formValues,
+      step,
+      theme,
+      accentColor,
+      profileShape,
+      layout,
+      badgeStyle,
+      fontPair,
+      logoPlacement,
+      ctaStyle,
+      backgroundPreset,
+      downloadFormat,
+      voice,
+      mood,
+      captions: captions as Record<string, Record<string, string>>,
+      activePlatformTab,
+      activeGraphicPlatform,
+      activeOutputTab,
+      backgroundImageUrl,
+      backgroundImageName,
+      generatedGuestEvent: persistedDraft?.generatedGuestEvent ?? null,
+      guestGenerationUsed: persistedDraft?.guestGenerationUsed ?? false,
+      migratedToAccount: persistedDraft?.migratedToAccount ?? false,
+      reuseSourceId: reuseEventId,
+      reuseSourceCreatedAt,
+    };
+
+    writeGuestDraft(draft);
+  }, [
+    accentColor,
+    activeGraphicPlatform,
+    activeOutputTab,
+    activePlatformTab,
+    backgroundImageName,
+    backgroundImageUrl,
+    backgroundPreset,
+    badgeStyle,
+    captions,
+    ctaStyle,
+    downloadFormat,
+    fontPair,
+    formValues,
+    layout,
+    logoPlacement,
+    mood,
+    profileShape,
+    reuseEventId,
+    reuseSourceCreatedAt,
+    selectedCategory,
+    selectedEvent,
+    selectedPlatforms,
+    step,
+    theme,
+    voice,
+  ]);
+
+  useEffect(() => {
+    if (!isAuthenticated || guestMigrationAttemptedRef.current) return;
+
+    const draft = readGuestDraft();
+    const generatedGuestEvent = draft?.generatedGuestEvent;
+    if (!generatedGuestEvent || draft.migratedToAccount) return;
+
+    guestMigrationAttemptedRef.current = true;
+
+    void (async () => {
+      try {
+        await saveToTimeline(generatedGuestEvent);
+        writeGuestDraft({
+          ...draft,
+          migratedToAccount: true,
+        });
+        setDownloadNotice("Your first draft is now saved to your account.");
+      } catch (error) {
+        guestMigrationAttemptedRef.current = false;
+        console.error(error);
+      }
+    })();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!reuseEventId) return;
@@ -242,6 +419,7 @@ export default function CreateFlow() {
       setEvent(reusedEvent);
       setPlatforms(validPlatforms.length > 0 ? validPlatforms : DEFAULT_PLATFORMS);
       setFormValues((current) => ({ ...current, ...timelineEvent.values }));
+      setReuseSourceCreatedAt(timelineEvent.createdAt);
       setActivePlatformTab(validPlatforms[0] || "linkedin");
       setStep("form");
     });
@@ -260,10 +438,21 @@ export default function CreateFlow() {
   };
 
   const handleCreateNewEvent = () => {
+    if (!isAuthenticated && readGuestDraft()?.guestGenerationUsed) {
+      openAuthGate("You're on a roll! Create an account to save this first draft and generate your next one.");
+      return;
+    }
+
     if (cameFromTemplate) {
+      clearGuestDraft();
       router.push("/create");
       return;
     }
+
+    clearGuestDraft();
+    setDownloadNotice(null);
+    setCaptions({});
+    setReuseSourceCreatedAt(null);
     setStep("entry");
     setEvent(null);
     setCategory(null);
@@ -299,6 +488,8 @@ export default function CreateFlow() {
   const activePrimaryLimit = getFieldLimit(activePlatformMeta.slug, activePrimaryOutput);
   const activePrimaryOverLimit = !!activePrimaryLimit && activePrimaryContent.length > activePrimaryLimit;
   const outputTabs = (hasGraphicOutputs ? ["graphic", "captions"] : ["captions"]) as Array<"graphic" | "captions">;
+  const guestDraft = readGuestDraft();
+  const guestGenerationUsed = !isAuthenticated && (guestDraft?.guestGenerationUsed ?? false);
 
   const setPlatformPreview = (slug: PlatformSlug) => {
     if (!supportsGraphicPreview(slug)) return;
@@ -308,6 +499,10 @@ export default function CreateFlow() {
 
   const handleGenerate = async () => {
     if (!selectedEvent) return;
+    if (!isAuthenticated && guestGenerationUsed) {
+      openAuthGate();
+      return;
+    }
 
     const platformObjs = PLATFORMS.filter((platform) => selectedPlatforms.includes(platform.slug));
     const generated: Partial<Record<PlatformSlug, PlatformContent>> = {};
@@ -332,22 +527,59 @@ export default function CreateFlow() {
     setActiveOutputTab(graphicPlatforms.length > 0 ? "graphic" : "captions");
 
     const categoryMeta = EVENT_CATEGORIES.find((item) => item.slug === selectedEvent.category)!;
-    try {
-      await saveToTimeline({
-        id: `${selectedEvent.id}_${Date.now()}`,
-        eventTypeId: selectedEvent.id,
-        eventTypeLabel: selectedEvent.label,
-        eventTypeIcon: selectedEvent.icon,
-        category: categoryMeta.slug,
-        categoryColor: categoryMeta.color,
-        title: interpolate(selectedEvent.cardHeadline, formValues),
-        values: formValues,
-        platforms: selectedPlatforms,
-        captions: timelineCaptions,
-        createdAt: new Date().toISOString(),
+    const generatedEvent: TimelineEvent = {
+      id: `${selectedEvent.id}_${Date.now()}`,
+      eventTypeId: selectedEvent.id,
+      eventTypeLabel: selectedEvent.label,
+      eventTypeIcon: selectedEvent.icon,
+      category: categoryMeta.slug,
+      categoryColor: categoryMeta.color,
+      title: interpolate(selectedEvent.cardHeadline, formValues),
+      values: formValues,
+      platforms: selectedPlatforms,
+      captions: timelineCaptions,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (isAuthenticated) {
+      try {
+        await saveToTimeline(generatedEvent);
+      } catch (error) {
+        console.error(error);
+      }
+    } else {
+      writeGuestDraft({
+        ...(guestDraft ?? getEmptyGuestDraft()),
+        selectedCategory,
+        selectedEventId: selectedEvent.id,
+        selectedPlatforms,
+        formValues,
+        step: "output",
+        theme,
+        accentColor,
+        profileShape,
+        layout,
+        badgeStyle,
+        fontPair,
+        logoPlacement,
+        ctaStyle,
+        backgroundPreset,
+        downloadFormat,
+        voice,
+        mood,
+        captions: generated as Record<string, Record<string, string>>,
+        activePlatformTab: selectedPlatforms[0] ?? "linkedin",
+        activeGraphicPlatform: graphicPlatforms[0] ?? "linkedin",
+        activeOutputTab: graphicPlatforms.length > 0 ? "graphic" : "captions",
+        backgroundImageUrl,
+        backgroundImageName,
+        generatedGuestEvent: generatedEvent,
+        guestGenerationUsed: true,
+        migratedToAccount: false,
+        reuseSourceId: reuseEventId,
+        reuseSourceCreatedAt,
       });
-    } catch (error) {
-      console.error(error);
+      setDownloadNotice("First template unlocked. Download it now, then create a free account to save it and generate more.");
     }
 
     setStep("output");
@@ -374,39 +606,41 @@ export default function CreateFlow() {
     setIsDownloading(true);
     setDownloadNotice(null);
     try {
-      const claimResponse = await fetch("/api/exports/claim", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          format: downloadFormat,
-          platform: activeGraphicMeta?.slug ?? null,
-          theme: selectedTheme,
-        }),
-      });
+      if (isAuthenticated) {
+        const claimResponse = await fetch("/api/exports/claim", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            format: downloadFormat,
+            platform: activeGraphicMeta?.slug ?? null,
+            theme: selectedTheme,
+          }),
+        });
 
-      const claimPayload = await claimResponse.json().catch(() => null);
+        const claimPayload = await claimResponse.json().catch(() => null);
 
-      if (!claimResponse.ok) {
-        if (claimPayload?.entitlements) {
-          setEntitlements(claimPayload.entitlements);
+        if (!claimResponse.ok) {
+          if (claimPayload?.entitlements) {
+            setEntitlements(claimPayload.entitlements);
+          }
+
+          setDownloadNotice(claimPayload?.error || "Unable to export right now.");
+          return;
         }
 
-        setDownloadNotice(claimPayload?.error || "Unable to export right now.");
-        return;
-      }
-
-      if (claimPayload?.entitlements) {
-        setEntitlements(claimPayload.entitlements);
-        if (claimPayload.entitlements.plan === "free") {
-          const remaining = claimPayload.entitlements.downloadsRemaining;
-          setDownloadNotice(`Free plan export recorded. ${remaining} download${remaining === 1 ? "" : "s"} left this month.`);
-        } else if (claimPayload.entitlements.plan === "pro" && claimPayload.entitlements.planExpiresAt) {
-          setDownloadNotice(`Pro access is active until ${new Date(claimPayload.entitlements.planExpiresAt).toLocaleDateString("en-IN")}.`);
-        } else {
-          setDownloadNotice("Lifetime access is active.");
+        if (claimPayload?.entitlements) {
+          setEntitlements(claimPayload.entitlements);
+          if (claimPayload.entitlements.plan === "free") {
+            const remaining = claimPayload.entitlements.downloadsRemaining;
+            setDownloadNotice(`Free plan export recorded. ${remaining} download${remaining === 1 ? "" : "s"} left this month.`);
+          } else if (claimPayload.entitlements.plan === "pro" && claimPayload.entitlements.planExpiresAt) {
+            setDownloadNotice(`Pro access is active until ${new Date(claimPayload.entitlements.planExpiresAt).toLocaleDateString("en-IN")}.`);
+          } else {
+            setDownloadNotice("Lifetime access is active.");
+          }
         }
       }
 
@@ -424,12 +658,16 @@ export default function CreateFlow() {
       link.download = `${selectedEvent?.id || "announcement"}-${downloadFormat}.png`;
       link.href = dataUrl;
       link.click();
+
+      if (!isAuthenticated) {
+        setDownloadNotice("PNG downloaded. Create a free account to save this draft and unlock your next generation.");
+      }
     } catch (error) {
       console.error(error);
     } finally {
       setIsDownloading(false);
     }
-  }, [activeGraphicMeta, downloadFormat, fmt, selectedEvent, selectedTheme]);
+  }, [activeGraphicMeta, downloadFormat, fmt, isAuthenticated, selectedEvent, selectedTheme]);
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -449,6 +687,27 @@ export default function CreateFlow() {
     };
     reader.readAsDataURL(file);
     event.target.value = "";
+  };
+
+  const handleOAuth = async (provider: "google" | "github") => {
+    const supabase = getSupabaseBrowserClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/create?resume=guest")}`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        queryParams: provider === "google"
+          ? {
+              access_type: "offline",
+              prompt: "consent",
+            }
+          : undefined,
+      },
+    });
+
+    if (error) {
+      setDownloadNotice(error.message);
+    }
   };
 
   const cardProps = {
@@ -480,6 +739,9 @@ export default function CreateFlow() {
   const previewScale = Math.min(1, 340 / fmt.displayW);
   const previewFrameHeight = Math.max(160, Math.round(fmt.displayH * previewScale));
   const currentStepNum = Math.max(1, progressSteps.findIndex((item) => item.key === currentProgressKey) + 1);
+  const googleEnabled = process.env.NEXT_PUBLIC_ENABLE_GOOGLE_AUTH === "true";
+  const githubEnabled = process.env.NEXT_PUBLIC_ENABLE_GITHUB_AUTH === "true";
+  const authNextPath = encodeURIComponent("/create?resume=guest");
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -541,7 +803,7 @@ export default function CreateFlow() {
       <div style={{ flex: 1, overflowY: "auto", padding: "28px clamp(16px, 3vw, 32px) 36px" }}>
         {step === "entry" && (
           <div style={{ maxWidth: "1080px", margin: "0 auto" }}>
-            {profileCompletionPct < 100 && (
+            {isAuthenticated && profileCompletionPct < 100 && (
               <div style={{
                 background: "#111",
                 border: "1px solid #1e2a12",
@@ -620,13 +882,13 @@ export default function CreateFlow() {
                   <EntryModeGlyph kind="manual" />
                 </div>
                 <div style={{ fontSize: "16px", fontWeight: 800, color: "#f0f0f0", marginBottom: "6px" }}>
-                  Start manually
+                  Start from Scratch
                 </div>
                 <div style={{ fontSize: "12px", color: "#666", lineHeight: 1.6, marginBottom: "12px" }}>
                   Pick the exact milestone you want to post, then generate LinkedIn-first content with platform variants.
                 </div>
                 <div style={{ fontSize: "11px", color: "#a3e635", fontWeight: 700 }}>
-                  Best for career milestones and flexible workflows {"->"}
+                  Best for flexible milestone writing {"->"}
                 </div>
               </button>
 
@@ -925,6 +1187,19 @@ export default function CreateFlow() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "12px" }}>
+              <div style={{ fontSize: "11px", color: "#666" }}>
+                Choose one or more platforms. Visual-first platforms add PNG export. Text-first platforms stay copy-only.
+              </div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <button onClick={() => setPlatforms(PLATFORMS.map((platform) => platform.slug))} style={tertiaryActionButtonStyle}>
+                  Select All
+                </button>
+                <button onClick={() => setPlatforms(DEFAULT_PLATFORMS)} style={tertiaryActionButtonStyle}>
+                  Clear to Default
+                </button>
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "24px" }}>
@@ -1285,16 +1560,24 @@ export default function CreateFlow() {
                   Generated for {selectedPlatforms.length} platform{selectedPlatforms.length > 1 ? "s" : ""}
                 </p>
                 <p style={{ fontSize: "12px", color: "#6f6f6f", margin: "6px 0 0" }}>
-                  {entitlements.plan === "free"
-                    ? `${entitlements.downloadsRemaining} free downloads left this month. Free exports include watermark and 3 themes.`
-                    : entitlements.plan === "pro"
-                      ? `Pro access is active${entitlements.planExpiresAt ? ` until ${new Date(entitlements.planExpiresAt).toLocaleDateString("en-IN")}` : ""}.`
-                      : "Lifetime access is active."}
+                  {!isAuthenticated
+                    ? "This first template is fully unlocked. Download it now, then create a free account for saving and unlimited generations."
+                    : entitlements.plan === "free"
+                      ? `${entitlements.downloadsRemaining} free downloads left this month. Free exports include watermark and 3 themes.`
+                      : entitlements.plan === "pro"
+                        ? `Pro access is active${entitlements.planExpiresAt ? ` until ${new Date(entitlements.planExpiresAt).toLocaleDateString("en-IN")}` : ""}.`
+                        : "Lifetime access is active."}
                 </p>
               </div>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button
-                  onClick={() => router.push("/timeline")}
+                  onClick={() => {
+                    if (isAuthenticated) {
+                      router.push("/timeline");
+                      return;
+                    }
+                    openAuthGate("Create a free account to save this first draft and keep all future work in your dashboard.");
+                  }}
                   style={{
                     padding: "8px 16px",
                     background: "#111",
@@ -1306,7 +1589,7 @@ export default function CreateFlow() {
                     cursor: "pointer",
                   }}
                 >
-                  Open Saved Work
+                  {isAuthenticated ? "Open Saved Work" : "Save This Draft"}
                 </button>
                 <button onClick={handleCreateNewEvent} style={{
                   padding: "8px 16px",
@@ -1322,6 +1605,34 @@ export default function CreateFlow() {
                 </button>
               </div>
             </div>
+
+            {!isAuthenticated && (
+              <div style={{
+                background: "#111",
+                border: "1px solid #304217",
+                borderLeft: "3px solid #a3e635",
+                borderRadius: "14px",
+                padding: "14px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                flexWrap: "wrap",
+                marginBottom: "18px",
+              }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#f0f0f0", marginBottom: "4px" }}>
+                    Sign up free to save this and generate unlimited templates
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#777", lineHeight: 1.55 }}>
+                    Your first template stays fully unlocked. Account creation only starts from your second generation.
+                  </div>
+                </div>
+                <button onClick={() => openAuthGate()} style={secondaryActionButtonStyle}>
+                  Save this draft
+                </button>
+              </div>
+            )}
 
             <div style={{ display: "flex", gap: "4px", background: "#141414", borderRadius: "8px", padding: "4px", width: "fit-content", marginBottom: "20px" }}>
               {outputTabs.map((tab) => (
@@ -1638,6 +1949,17 @@ export default function CreateFlow() {
           </div>
         )}
       </div>
+      <AuthGateModal
+        open={authModalOpen}
+        message={authMessage}
+        googleEnabled={googleEnabled}
+        githubEnabled={githubEnabled}
+        onClose={() => setAuthModalOpen(false)}
+        onGoogle={() => void handleOAuth("google")}
+        onGitHub={() => void handleOAuth("github")}
+        signInHref={`/sign-in?next=${authNextPath}`}
+        signUpHref={`/sign-up?next=${authNextPath}`}
+      />
     </div>
   );
 }
@@ -1647,6 +1969,69 @@ function StyleSection({ label, children }: { label: string; children: React.Reac
     <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "12px", padding: "14px 14px 12px" }}>
       <label style={{ fontSize: "11px", color: "#666", display: "block", marginBottom: "9px", letterSpacing: "0.02em" }}>{label}</label>
       {children}
+    </div>
+  );
+}
+
+function AuthGateModal({
+  open,
+  message,
+  googleEnabled,
+  githubEnabled,
+  onClose,
+  onGoogle,
+  onGitHub,
+  signInHref,
+  signUpHref,
+}: {
+  open: boolean;
+  message: string;
+  googleEnabled: boolean;
+  githubEnabled: boolean;
+  onClose: () => void;
+  onGoogle: () => void;
+  onGitHub: () => void;
+  signInHref: string;
+  signUpHref: string;
+}) {
+  if (!open) return null;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 40 }}>
+      <div style={{ width: "100%", maxWidth: "460px", background: "#101010", border: "1px solid #242424", borderRadius: "20px", padding: "24px", boxShadow: "0 24px 80px rgba(0,0,0,0.45)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", marginBottom: "16px" }}>
+          <div>
+            <div style={{ fontSize: "11px", color: "#a3e635", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "8px" }}>Keep going</div>
+            <div style={{ fontSize: "22px", fontWeight: 800, color: "#f0f0f0", lineHeight: 1.15, marginBottom: "8px" }}>Save this first draft and unlock the next one</div>
+            <div style={{ fontSize: "13px", color: "#777", lineHeight: 1.65 }}>{message}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", color: "#777", border: "1px solid #2a2a2a", borderRadius: "10px", padding: "6px 10px", fontSize: "12px" }}>Close</button>
+        </div>
+
+        <div style={{ display: "grid", gap: "10px" }}>
+          {googleEnabled && (
+            <button onClick={onGoogle} style={{ padding: "12px 14px", background: "#fff", color: "#111", fontSize: "13px", fontWeight: 700, borderRadius: "10px", border: "1px solid #d9d9d9" }}>
+              Continue with Google
+            </button>
+          )}
+          {githubEnabled && (
+            <button onClick={onGitHub} style={{ padding: "12px 14px", background: "#161616", color: "#f0f0f0", fontSize: "13px", fontWeight: 700, borderRadius: "10px", border: "1px solid #2a2a2a" }}>
+              Continue with GitHub
+            </button>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
+            <Link href={signInHref} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "44px", borderRadius: "10px", textDecoration: "none", background: "#171717", color: "#f0f0f0", border: "1px solid #2a2a2a", fontSize: "13px", fontWeight: 700 }}>
+              Sign in with Email
+            </Link>
+            <Link href={signUpHref} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: "44px", borderRadius: "10px", textDecoration: "none", background: "linear-gradient(135deg,#a3e635,#84cc16)", color: "#000", border: "none", fontSize: "13px", fontWeight: 800 }}>
+              Create Free Account
+            </Link>
+          </div>
+          <div style={{ fontSize: "11px", color: "#666", lineHeight: 1.55 }}>
+            Your first template stays available in this browser. Signing in saves it to your account and unlocks unlimited future generations.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
